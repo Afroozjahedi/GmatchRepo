@@ -1,299 +1,367 @@
-###
+#==============================================================================
 # Copyright statement comment
-# Author comment:
-# File description comment, including purpose of program, inputs, and outputs
-# new defined distance matrix.distance is zero if two subjects are in the same
-# terminal node, 1-pvalue if different terminal node.
-# source() and library() statements
-# Function definitions
-# Executed statements, if applicable (e.g., print, plot)
-###
+# Author: Afrooz Jahedi
+# Goal: Create groupwise (1-3) matching.
+# Inputs: data, variables to match on, number of trees, method of matching
+# Outputs:pvalues and standardized mean difference for each variable.number 
+#  of subjects in each group
+# Description: build a distance matrix based on random forest where subject distance  
+# in the same terminal node is zero and subjects in different terminal nodes have
+#  distance equal to 1-chi-square pvalue.
+#==============================================================================
 
 Gmatch <- function (data, matchList, nTree, method) {
-  # select best candidate from a group(ASD/TD) to be matched for (TD/ASD).
-  #
-  # Args:
-  #   data: unmatched data with no missing values.
-  #   matchList: list of variables that are meant to be matched on.,
-  #
-  #   nTree: Number of trees to build the forest.
-  #
-  # Returns:
-  #   The matched data and p-value and SMD for each variable
-  
-  # Cleaning data ####
-  # it is important to have ASD first and then TD for this code
+  #==== Cleaning data ====
+  # It is important to have ASD first and then TD for distance matrix
+  #?????????????????????????? how to not hard code variables.
   data$group <- as.factor (data$group)
+  
+  # Number of subjects in each group for original data
   table(data$group)
   
-  # screen for outlier in motion variable
-  
+  # screening for outlier in motion variable
   outlierVal <-
     mean(data$RMSD.PRE.censoring) + 3 * sd(data$RMSD.PRE.censoring)
+  
+  # Create the dataframe for matching without outlier and label rows
   Gdata <-
     data[which(data$RMSD.PRE.censoring <= outlierVal), matchList]
   rownames(Gdata) <- data$subj
   rownames(Gdata) <- data[, "subj"]
-  table (Gdata$group)
-  #outliers <- as.character(data[which(data$RMSD.PRE.censoring >= outlierVal),]$subj)
-  #cat("subjects with extreme motion are",outliers,"\n")
   
-  # Gdata = data.frame(data[,matchList[1]] ,data[,matchList[2]], data[,matchList[3]],
-  #                   data[,matchList[4]], data[,matchList[5]],  data[,matchList[6]])
-  #colnames(Gdata) = varList
-  # data_real = data.frame(data[1],group ,Gender, Handedness, RMSD.PRE.censoring, Age, WASI.NVIQ)
-  # Tree building ###
+  # Number of subjects in each group for filtered data
+  table (Gdata$group)
+  
+  # Outlier Subjects
+  outliers <-
+    as.character(data[which(data$RMSD.PRE.censoring >= outlierVal), ]$subj)
+  cat("subjects with extreme motion are", outliers, "\n")
+  
+  
+  #==== Tree building ====
+  # Building the tree using covariates using greedy search for binary response
+  #  which uses gini index for split. stop criteria for splitting is thirthy
+  # subjects. At each split we use randomly three variables.
+  #????????????????Hard coding variables
   form <-
     group ~ Gender + Handedness + RMSD.PRE.censoring + Age + WASI.NVIQ
-  (
-    mydata <- grow(
-      form,
-      data = Gdata ,
-      search = "greedy" ,
-      method = "class" ,
-      split = "gini" ,
-      minsplit = 30,
-      mtry = 3,
-      nsplit = NULL
-    )
+  mydata <- grow(
+    form,
+    data = Gdata ,
+    search = "greedy" ,
+    method = "class" ,
+    split = "gini" ,
+    minsplit = 30,
+    mtry = 3,
+    nsplit = NULL
   )
-  
+  # Plot the tree
   plot(mydata)
   
-  library("plot3D")
-  x <- Gdata$WASI.NVIQ
-  y <- Gdata$Age
-  z <- Gdata$RMSD.PRE.censoring
-  scatter3D(  x,  y,  z,  phi = 0,bty = "g",type = "h",
-    ticktype = "detailed",  pch = 19,  cex = 0.5, xlab = "NVIQ",
-    ylab = "Age",   zlab = "Motion",main = "BRIEF data before matching",
-    clab = c("Motion"))
-  
-  # pvalue before matching ###
-  pvalMotion <-(t.test(RMSD.PRE.censoring ~ group, data = Gdata))$p.value
+  #==== variable pvalue before matching ====
+  #????????????????hard coding variables
+  pvalMotion <-
+    (t.test(RMSD.PRE.censoring ~ group, data = Gdata))$p.value
   pvalAge <- (t.test(Age ~ group, data = Gdata))$p.value
   pvalNVIQ <- (t.test(WASI.NVIQ ~ group, data = Gdata))$p.value
-  pvalHandedness <-chisq.test(Gdata$group, Gdata$Handedness)$p.value
   pvalGender <- chisq.test(Gdata$group, Gdata$Gender)$p.value
+  pvalHandedness <-
+    chisq.test(Gdata$group, Gdata$Handedness)$p.value
   
-  A <- printPval(pvalMotion, "Gdata$RMSD.PRE.censoring")
-  B <- printPval(pvalAge, "Gdata$Age")
-  C <- printPval(pvalNVIQ, "Gdata$WASI.NVIQ")
-  H <- printPval(pvalHandedness, "Gdata$Handedness")
-  I <- printPval(pvalGender, "Gdata$Gender")
+  # Tabling pvalues for output
+  pvalsBef <-
+    matrix(c(pvalMotion, pvalAge, pvalNVIQ, pvalGender, pvalHandedness),
+           ncol = 5)
+  colnames(pvalsBef) <-
+    c("RMSD.PRE.censoring",
+      "Age",
+      "WASI.NVIQ",
+      "Handedness",
+      "Gender")
+  rownames(pvalsBef) <- "BEFORE"
+  pvalsBef <- as.table(pvalsBef)
   
- pvals <- matrix(c(A,B,C,H,I),ncol=5)
-   colnames(pvals) <- c("RMSD.PRE.censoring","Age","WASI.NVIQ","Handedness", "Gender")
-   rownames(pvals) <- c("ntree")
-   pvals <- as.table(pvals)
-   pvals
- 
+  # Calculate standardized mean difference
   smdMotion <- smd(Gdata, RMSD.PRE.censoring)
   smdAge <- smd(Gdata, "Age")
   smdNVIQ <- smd(Gdata, "WASI.NVIQ")
   smdGender <- smd(Gdata, "Gender")
   smdHandedness <- smd(Gdata, "Handedness")
   
-  ### Random Forest growing ###
+  # Tabling smd for output
+  smdBef <-
+    matrix(c(smdMotion, smdAge, smdNVIQ, smdGender, smdHandedness),
+           ncol = 5)
+  colnames(smdBef) <-
+    c("RMSD.PRE.censoring",
+      "Age",
+      "WASI.NVIQ",
+      "Handedness",
+      "Gender")
+  rownames(smdBef) <- "BEFORE"
+  smdBef <- as.table(smdBef)
+  
+  #==== Random Forest growing ====
   set.seed(184684)
   ntrees <- nTree
-  rfRF100 <- rfConst(ntrees = ntrees,formula = form, training =  Gdata,
-      search = "greedy",  method = "class", split = "gini", mtry = 3,
-      nsplit = NULL,  minsplit = 30,maxdepth = 10, minbucket = 10,
-      bootstrap = FALSE    )
-  # return(rfRF100)
   
-  ### Reference group for matching to start with ########
-  # which group has less subject. That group will be our reference for matching.
+  # Create random forest using the same matching covariates using all data
+  rfRF100 <-
+    rfConst(
+      ntrees = ntrees,
+      formula = form,
+      training =  Gdata,
+      search = "greedy",
+      method = "class",
+      split = "gini",
+      mtry = 3,
+      nsplit = NULL,
+      minsplit = 30,
+      maxdepth = 10,
+      minbucket = 10,
+      bootstrap = FALSE
+    )
+  
+  #==== Reference group for matching to start====
+  
+  # Which group has less subject. That group will be our reference for matching.
   ASD <- Gdata$group == 1
-  if (NROW (Gdata[ASD, ]) < NROW (Gdata[!ASD,])) {
-    (nMin = NROW (Gdata[ASD,]))
+  if (NROW (Gdata[ASD,]) < NROW (Gdata[!ASD, ])) {
+    (nMin = NROW (Gdata[ASD, ]))
   } else {
-    nMin <- NROW (Gdata[!ASD,])
+    nMin <- NROW (Gdata[!ASD, ])
   }
-  #terminal node for subjects across all trees.
+  #=================== Creating chi-sqr distance matrix ================================
+  # Extracting terminal node for subjects across all trees.
   nodeResponse <- sapply(rfRF100, function(x) {
     predict(x$tree, newdata = Gdata , type = "node")
   })
-  
-  #plot(rfRF100[[1]]$tree)
-  #debug(x2Dist)
-  #a= x2Dist(rfRF100[[1]]$tree,nodeResponse)
-  
+  # Preparing distance matrix 
   sumXDistMat = matrix(0, nrow = NROW(nodeResponse),ncol = NROW(nodeResponse))
   colnames(sumXDistMat) <- rownames(nodeResponse)
   rownames(sumXDistMat) <- rownames(nodeResponse)
   
-  #treeNum <- 2
   ntrees <- nTree
+  
+  # Define a function x2Dist
   #x2Dist(rfRF100[[treeNum]]$tree,nodeResponse,treeNum)
   
+  # Add up tree p-values 
   for (treeNum in 1:ntrees){
     sumXDistMat <- sumXDistMat + x2Dist(rfRF100[[treeNum]]$tree,nodeResponse,treeNum)
   }
-  xDistFor <- sumXDistMat/ntrees
+  
+  #average the distance matrix and label rows and columns.
+  xDistFor <- sumXDistMat / ntrees
   rownames(xDistFor) <- rownames(Gdata)
   colnames(xDistFor) <- rownames(Gdata)
   
-  #Descriptive statistics for distance matrix
-  quantile(xDistFor)
-  #  0%           25%       50%       75%      100% 
-  #0.0000000 0.6075259 0.7792734 0.9103751 0.9951918 
-  quantile(xDistFor,c(0.25,0.35,0.45,0.55,0.6,0.66, 0.7,0.8))
-  #      25%       35%       45%       55%       60%       66%       70%       80% 
-  # 0.6075259 0.6921892 0.7658434 0.8012043 0.8428033 0.8804234 0.8930838 0.9271538 
+  #==== percentile info from distance matrix =====
+  quantile(xDistFor, c(0.25, 0.35, 0.45, 0.55, 0.6, 0.66, 0.7, 0.8))
+  #      25%       35%       45%       55%       60%       66%       70%       80%
+  # 0.6075259 0.6921892 0.7658434 0.8012043 0.8428033 0.8804234 0.8930838 0.9271538
   
-  # Descriptive statistics for just ASD vs TD distance matrix
-  selXDistFor <- xDistFor[1:nMin,(nMin+1):NROW(Gdata)]
-  quantile(selXDistFor)
-  #0%           25%       50%       75%      100% 
-  #0.0000000 0.6351190 0.8039192 0.9262075 0.9950895 
-  quantile(selXDistFor,c(0.25,0.33, 0.35,0.45,0.55,0.6,0.66, 0.7,0.8))
-  #   25%       33%       35%       45%       55%       60%       66%       70%       80% 
-  #0.6351190 0.7066034 0.7289825 0.7766001 0.8459433 0.8761321 0.8987989 0.9112902 0.9480292 
-
-  #### New deifined matrix-x2distance matrix 
-  #### x2-Disstance matrix deleting trouble makers and exact matching ###
+  # percentile for just ASD vs TD distance matrix
+  selXDistFor <- xDistFor[1:nMin, (nMin + 1):NROW(Gdata)]
+  quantile(selXDistFor, c(0.25, 0.33, 0.35, 0.45, 0.55, 0.6, 0.66, 0.7, 0.8))
+  #   25%       33%       35%       45%       55%       60%       66%       70%       80%
+  #0.6351190 0.7066034 0.7289825 0.7766001 0.8459433 0.8761321 0.8987989 0.9112902 0.9480292
   
-  #there are different methods
-  # 1- 1To3GH: 1 to 3 matching filtering subject x2-distance for Gender and handedness
-  # 2- 1To3Dist: 1 to 3 based on x2-distance matrix
-  # 3- 1To3Caliper: 1 to 3 matching filtering distance based on propensity score and 
-  #    within those find smallest distance.
   
-  if(method =="1To3GH"){
+  #==== 1To3GH ====
+  # 1- 1To3GH: 1-3 filtering subject x2-distance for Gender and handedness.
+  #           Based on distance percentile, certain threshold will be picked.
+  if(method =="1To3GH") {
+    #Tight matching on gender and handedness using certain distance thershold
     
-  x2distForSel <- xDistFor[1:nMin, (nMin + 1):ncol(xDistFor)]
-  rownames(x2distForSel) <- rownames(Gdata[1:nMin, ])
-  colnames(x2distForSel) <- rownames(Gdata[(nMin + 1):ncol(xDistFor), ])
-  
-  #filter TD gender that are equal to ASD gender to 1 otherwise 0.
-  library(foreach)
-  filtGen <- foreach (i = 1:nMin) %do%
-    ifelse(Gdata[rownames(x2distForSel)[i],
-                 "Gender"] == Gdata[colnames(x2distForSel), "Gender"] , 1, 0)
-  
-  filtGen <-matrix(unlist(filtGen), ncol = ncol(x2distForSel), byrow = T)
-  colnames(filtGen) <- rownames(Gdata[(nMin + 1):ncol(xDistFor), ])
-  rownames(filtGen) <- rownames(Gdata[1:nMin, ])
-  
-  filtHand <- foreach (i = 1:nMin) %do%
-    ifelse(Gdata[rownames(x2distForSel)[i],
-                 "Handedness"] == Gdata[colnames(x2distForSel), "Handedness"] , 1, 0)
-  
-  filtHand <- matrix(unlist(filtHand), ncol = ncol(x2distForSel), byrow = T)
-  colnames(filtHand) <- rownames(Gdata[(nMin + 1):ncol(xDistFor), ])
-  rownames(filtHand) <- rownames(Gdata[1:nMin, ])
-  
-  filtGenHand <- filtGen + filtHand
-  rownames(filtGenHand) <- rownames(Gdata[1:nMin, ])
-  colnames(filtGenHand) <- rownames(Gdata[(nMin + 1):ncol(xDistFor),])
-  
-  distFiltVal <- 0.7
-  filtGenHandDist <- matrix(
-      ifelse(x2distForSel[,] <= distFiltVal & filtGenHand[,] == 2,
-             x2distForSel, 100),nrow = nMin , byrow = F)
-  rownames(filtGenHandDist) <- rownames(Gdata[1:nMin,])
-  colnames(filtGenHandDist) <- rownames(Gdata[(nMin + 1):ncol(xDistFor),])
-  
-  outFileName = paste("output//x2DistMat", distFiltVal, ".csv", sep="")
-  write.table(filtGenHandDist, outFileName, sep=",", col.names=TRUE)
-  
-  #ASD trouble makers
-  #table((rowSums(filtGenHandDist) >= 5200))
-  # Useless TD's
-  #table(colSums(filtGenHandDist) >= 4700)
-  
-  remFilt = filtGenHandDist[!apply(filtGenHandDist, 1, function(x) {
-    all(x == 100) }),!apply(filtGenHandDist, 2, function(x) {all(x == 100)})]
-  remRowName <- rownames(remFilt)
-  remColName <- colnames(remFilt)
-  
-  remained <- x2distForSel[remRowName, remColName]
-  
-  #outFileName = paste("output//x2distance matrix 0.4GH", ".csv", sep = "")
-  #write.table(remained, outFileName, sep = ",", col.names = TRUE)
-  
-  selCandid <- 3
-  candidValFilt <- apply(remained, 1, function(x)
+    # ASD and TD distance only and label them.
+    x2distForSel <- xDistFor[1:nMin, (nMin + 1):ncol(xDistFor)]
+    rownames(x2distForSel) <- rownames(Gdata[1:nMin, ])
+    colnames(x2distForSel) <-
+      rownames(Gdata[(nMin + 1):ncol(xDistFor), ])
+    
+    #filter TD gender that are equal to ASD gender label to 1 otherwise 0.
+    library(foreach)
+    filtGen <- foreach (i = 1:nMin) %do%
+      ifelse(Gdata[rownames(x2distForSel)[i],
+                   "Gender"] == Gdata[colnames(x2distForSel), "Gender"] , 1, 0)
+    
+    filtGen <-
+      matrix(unlist(filtGen),
+             ncol = ncol(x2distForSel),
+             byrow = T)
+    colnames(filtGen) <- rownames(Gdata[(nMin + 1):ncol(xDistFor), ])
+    rownames(filtGen) <- rownames(Gdata[1:nMin, ])
+    #filter TD handedness that are equal to ASD handedness label to 1 otherwise 0
+    filtHand <- foreach (i = 1:nMin) %do%
+      ifelse(Gdata[rownames(x2distForSel)[i],
+                   "Handedness"] == Gdata[colnames(x2distForSel), "Handedness"] , 1, 0)
+    
+    filtHand <-
+      matrix(unlist(filtHand),
+             ncol = ncol(x2distForSel),
+             byrow = T)
+    colnames(filtHand) <-
+      rownames(Gdata[(nMin + 1):ncol(xDistFor), ])
+    rownames(filtHand) <- rownames(Gdata[1:nMin, ])
+    
+    # Add these two conditions
+    filtGenHand <- filtGen + filtHand
+    rownames(filtGenHand) <- rownames(Gdata[1:nMin,])
+    colnames(filtGenHand) <-
+      rownames(Gdata[(nMin + 1):ncol(xDistFor), ])
+    
+    # Distance thereshold
+    distFiltVal <- 0.7
+    
+    # Select TD subjects tha t qualify these 3 conditions.
+    filtGenHandDist <- matrix(
+      ifelse(
+        x2distForSel[,] <= distFiltVal & filtGenHand[,] == 2,
+        x2distForSel,
+        100
+      ),
+      nrow = nMin ,
+      byrow = F
+    )
+    rownames(filtGenHandDist) <- rownames(Gdata[1:nMin, ])
+    colnames(filtGenHandDist) <-
+      rownames(Gdata[(nMin + 1):ncol(xDistFor), ])
+    
+    # Create distance matrix csv file.
+    outFileName = paste("output//x2DistMat", distFiltVal, ".csv", sep = "")
+    write.table(filtGenHandDist,
+                outFileName,
+                sep = ",",
+                col.names = TRUE)
+    
+    #=== what????? ====
+    remFilt = filtGenHandDist[!apply(filtGenHandDist, 1, function(x) {
+      all(x == 100)
+    }),!apply(filtGenHandDist, 2, function(x) {
+      all(x == 100)
+    })]
+    remRowName <- rownames(remFilt)
+    remColName <- colnames(remFilt)
+    
+    remained <- x2distForSel[remRowName, remColName]
+    
+    #outFileName = paste("output//x2distance matrix 0.4GH", ".csv", sep = "")
+    #write.table(remained, outFileName, sep = ",", col.names = TRUE)
+    
+    # Select 3 candidates for group-wise matching.
+    selCandid <- 3
+    
+    # candidate values
+    candidValFilt <- apply(remained, 1, function(x)
       return((sort(x))[1:selCandid]))
+    
+    # who are the TD selected candidates. not TD labels just their index in xDistFor mat.
+    candidFilt <- apply(remained, 1, function(x)
+      return(((order(
+        x
+      ))[1:selCandid])))
+    
+    # Vector of TD candidates and their index
+    distFilt <- (table(candidFilt))
+    namesTD <-
+      colnames(remained[, as.numeric(names(table(candidFilt)))])
+    
+    # Shows the distribution of number of times each TD is selected
+    hist(distFilt, main = "Number of times a subject is selected")
+    dataNewExaX2 <- rbind (Gdata[remRowName, ], (Gdata[namesTD, ]))
   
-  # who are the TD selected candidates. not TD labels just their index in xDistFor mat.
-  candidFilt <- apply(remained, 1, function(x)
-      return(((order(x))[1:selCandid])))
-  
-  # Vector of TD candidates
-  distFilt <- (table(candidFilt))
-  namesTD <- colnames(remained[, as.numeric(names(table(candidFilt)))])
-  hist(distFilt, main = "Number of times a subject is selected")
-  
-  ###  Matched data using defined ditance deleting trouble ASD
-  dataNewExaX2 <- rbind (Gdata[remRowName,], (Gdata[namesTD,]))
-  
-  ### distance Matrix p-values after matching Matched data deleting trouble ASD
   pvalHandedness <- chisq.test(dataNewExaX2$group, dataNewExaX2$Handedness)$p.value
   pvalGender <- chisq.test(dataNewExaX2$group, dataNewExaX2$Gender)$p.value
   pvalMotion <- (t.test(RMSD.PRE.censoring ~ group, data = dataNewExaX2))$p.value
   pvalAge <- (t.test(Age ~ group, data = dataNewExaX2))$p.value
   pvalNVIQ <- (t.test(WASI.NVIQ ~ group, data = dataNewExaX2))$p.value
   
-  DDF <- printPval(pvalMotion, "dataNewExaX2$RMSD.PRE.censoring")
-  EDF <- printPval(pvalAge, "dataNewExaX2$Age")
-  GDF <- printPval(pvalNVIQ, "dataNewExaX2$WASI.NVIQ")
-  JDF <- printPval(pvalHandedness, "dataNewExaX2$handedness")
-  KDF <- printPval(pvalGender, "dataNewExaX2$Gender")
+  # Tabling pvalues for output
+  pvals1_GH <-
+    matrix(c(pvalMotion, pvalAge, pvalNVIQ, pvalGender, pvalHandedness),
+           ncol = 5)
+  colnames(pvals1-3GH) <-
+    c("RMSD.PRE.censoring",
+      "Age",
+      "WASI.NVIQ",
+      "Handedness",
+      "Gender")
+  rownames(pvals1_3GH) <- "1-3GH"
+  pvals1_3GH <- as.table(pvals1_3GH)
   
   smdMotion <- smd(dataNewExaX2, RMSD.PRE.censoring)
   smdAge <- smd(dataNewExaX2, Age)
   smdNVIQ <- smd(dataNewExaX2, WASI.NVIQ)
   smdGender <- smd(dataNewExaX2, Gender)
   smdhandedness <- smd(dataNewExaX2, Handedness)
-  print(table(dataNewExaX2$group))
-  }else if(method=="1To3Dist"){
   
-  ### x2-defined distance using 1-3 match ###
-  nodeResponse <- sapply(rfRF100, function(x) {
+  # Tabling smd for output
+  smd1_3GH <-
+    matrix(c(smdMotion, smdAge, smdNVIQ, smdGender, smdHandedness),
+           ncol = 5)
+  colnames(smd1_3GH) <-
+    c("RMSD.PRE.censoring",
+      "Age",
+      "WASI.NVIQ",
+      "Handedness",
+      "Gender")
+  rownames(smd1_3GH) <- "1_3GH"
+  smd1_3GH <- as.table(smd1_3GH)
+  print(table(dataNewExaX2$group))
+  
+  } else if (method == "1To3Dist") {
+    ### x2-defined distance using 1-3 match
+    # 2- 1To3Dist: 1 to 3 based on x2-distance matrix
+    nodeResponse <- sapply(rfRF100, function(x) {
       predict(x$tree, newdata = Gdata , type = "node")
     })
-  
-  xDistFor <- sumXDistMat/ntrees
-  rownames(xDistFor) <- rownames(Gdata)
-  colnames(xDistFor) <- rownames(Gdata)
-  #mean(xDistFor)  
-  
-  candidVal <- apply(xDistFor[1:nMin , (nMin + 1):ncol(xDistFor)], 1, function(x)
-      return((sort(x))[1:3]))
-  
-  candid <- apply(xDistFor[1:nMin, (nMin + 1):ncol(xDistFor)], 1, function(x)
-      return((order(x))[1:3] + nMin))
+    
+    #xDistFor <- sumXDistMat/ntrees
+    #rownames(xDistFor) <- rownames(Gdata)
+    #colnames(xDistFor) <- rownames(Gdata)
+    #mean(xDistFor)
+    
+    candidVal <-
+      apply(xDistFor[1:nMin , (nMin + 1):ncol(xDistFor)], 1, function(x)
+        return((sort(x))[1:3]))
+    
+    candid <-
+      apply(xDistFor[1:nMin, (nMin + 1):ncol(xDistFor)], 1, function(x)
+        return((order(x))[1:3] + nMin))
   
   distCandid <- (table(candid))
   names(distCandid) <- rownames(Gdata[as.numeric(names(table(candid))),])
   hist(distCandid, main = "Number of times a subject is selected")
   
   # Matched data using definde ditance
-  dataNew1to3X2 <- rbind (Gdata[1:nMin,], (Gdata[rownames(distCandid),]))
+  dataNew1to3X2 <-
+    rbind (Gdata[1:nMin, ], (Gdata[rownames(distCandid), ]))
   
-  #### distance Matrix p-values after matching for  ####
-  pvalHandedness <- chisq.test(dataNew1to3X2$group, dataNew1to3X2$Handedness)$p.value
-  pvalGender <- chisq.test(dataNew1to3X2$group, dataNew1to3X2$Gender)$p.value
-  pvalMotion <- (t.test(RMSD.PRE.censoring ~ group, data = dataNew1to3X2))$p.value
+  # 1-3 matching #
+  pvalHandedness <-
+    chisq.test(dataNew1to3X2$group, dataNew1to3X2$Handedness)$p.value
+  pvalGender <-
+    chisq.test(dataNew1to3X2$group, dataNew1to3X2$Gender)$p.value
+  pvalMotion <-
+    (t.test(RMSD.PRE.censoring ~ group, data = dataNew1to3X2))$p.value
   pvalAge <- (t.test(Age ~ group, data = dataNew1to3X2))$p.value
-  pvalNVIQ <- (t.test(WASI.NVIQ ~ group, data = dataNew1to3X2))$p.value
+  pvalNVIQ <-
+    (t.test(WASI.NVIQ ~ group, data = dataNew1to3X2))$p.value
   
-  D <- printPval(pvalMotion, "dataNew1to3X2$RMSD.PRE.censoring")
-  E <- printPval(pvalAge, "dataNew1to3X2$Age")
-  G <- printPval(pvalNVIQ, "dataNew1to3X2$WASI.NVIQ")
-  J <- printPval(pvalHandedness, "dataNew1to3X2$handedness")
-  K <- printPval(pvalGender, "dataNew1to3X2$Gender")
   
   smdMotion <- smd(dataNew1to3X2, RMSD.PRE.censoring)
   smdAge <- smd(dataNew1to3X2, Age)
   smdNVIQ <- smd(dataNew1to3X2, WASI.NVIQ)
   smdGender <- smd(dataNew1to3X2, Gender)
   smdhandedness <- smd(dataNew1to3X2, Handedness)
+  
   print(table(dataNew1to3X2$group))
     }else if(method == "1To3Caliper"){
+      
+      # 3- 1To3Caliper: 1 to 3 matching filtering distance based on propensity score and 
+      #    within those find smallest distance.
+      
     #### Distance within calipers by the propensity score############
     #### Propenity Score ###
     # predict(rfRF100[[1]]$tree[[1]],type = "prob")
@@ -391,5 +459,19 @@ smdNVIQ <- smd(dataNewInv, WASI.NVIQ)
 smdGender <- smd(dataNewInv, Gender)
 smdhandedness <- smd(dataNewInv, Handedness)
 table(dataNewInv$group)
+
+pvalsInv <-
+  matrix(c(pvalMotion, pvalAge, pvalNVIQ, pvalGender, pvalHandedness),
+         ncol = 5)
+colnames(pvalsInv) <-
+  c("RMSD.PRE.censoring",
+    "Age",
+    "WASI.NVIQ",
+    "Handedness",
+    "Gender")
+rownames(pvalsInv) <- "Inverse"
+pvalsInv <- as.table(pvalsInv)
+pvalsInv
+rbind(pvals,pvalsInv)
   }
 }

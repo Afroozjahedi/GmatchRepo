@@ -14,7 +14,8 @@ smd = function(Data,Var){
   varASD = var(Data[ASD,as.character(pars$Var)],na.rm = TRUE)
   varTD = var(Data[!ASD,as.character(pars$Var)],na.rm = TRUE)
   stdMeanDiff = (mASD - mTD)/(sqrt((varASD + varTD)/2))
-  cat("SMD",pars$Data,pars$Var,"=", stdMeanDiff,"\n")}
+  #cat("SMD",pars$Data,pars$Var,"=", stdMeanDiff,"\n")}
+  return(stdMeanDiff)}
 }
 #debug(smd)
  #smd(nonOutlierLowADOS,RMSD.PRE.censoring)
@@ -33,5 +34,5 @@ smd = function(Data,Var){
    #sd(data[,as.character(pars$name)])
    
 # }
-# b(mtcars,cyl)
+
  

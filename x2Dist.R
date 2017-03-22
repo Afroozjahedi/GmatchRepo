@@ -1,8 +1,18 @@
-x2Dist <- function(tree,terminalNode,treeNum){
-  pars <- as.list(match.call())
+#==============================================================================
+# Copyright statement comment
+# Author: Afrooz Jahedi
+# Goal:Calculate chi-square pvalue of a two by two table of subjects in different 
+#      nodes split by group variable.
+# Inputs: info from a tree, terminal node index, of trees in the forest.
+# Outputs: distance matrix based on p-values 
+# Description: 
+#==============================================================================
 
+#x2Dist(rfRF100[[treeNum]]$tree,nodeResponse,treeNum)
+x2Dist <- function(tree, terminalNode, treeNum) {
+  pars <- as.list(match.call())
   
-  # Terminal nodes
+  # Identify terminal nodes
   terNode <- nodeids(tree, terminal = TRUE)
   
   # How many subjects in each terminal node
@@ -26,7 +36,7 @@ x2Dist <- function(tree,terminalNode,treeNum){
     }
   }
   
-  #take out diagonal elements of terminal nodes (e.g.2,2)
+  #take out diagonal elements of terminal nodes (e.g.2,2) we don't need them.
   diag(xPval) <- NA
   colnames(xPval) <- terNode
   rownames(xPval) <- terNode
