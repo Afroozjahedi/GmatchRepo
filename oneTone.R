@@ -6,9 +6,7 @@
 # Outputs:pvalues and standardized mean difference for each variable.number 
 #  of subjects in each group
 # Description: Using the distance matrix from chi-squre definition, in which 
-# rows are ASD and TD are columns. build a distance matrix based on random forest where subject distance  
-# in the same terminal node is zero and subjects in different terminal nodes have
-#  distance equal to 1-chi-square pvalue.
+# rows are ASD and TD are columns. Any method is fine. manuall matching was done.
 #==============================================================================
 
 Gmatch <- function (data, matchList, nTree, method) {
