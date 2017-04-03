@@ -159,12 +159,79 @@ Gmatch <- function (data, matchList, nTree, method) {
   rownames(x2distForSel) <- rownames(Gdata[1:nMin,])
   colnames(x2distForSel) <-
     rownames(Gdata[(nMin + 1):ncol(xDistFor),])
-  
+  #==== 1To3GH ====
+  # 1- 1To3GH: 1-3 filtering subject x2-distance for Gender and handedness.
+  #           Based on distance percentile, certain threshold will be picked.
+  if(method =="1To3GH") {
+    #Tight matching on gender and handedness using certain distance thershold
+    
+    # ASD and TD distance only and label them.
+    x2distForSel <- xDistFor[1:nMin, (nMin + 1):ncol(xDistFor)]
+    rownames(x2distForSel) <- rownames(Gdata[1:nMin, ])
+    colnames(x2distForSel) <-
+      rownames(Gdata[(nMin + 1):ncol(xDistFor), ])
+    
+    #filter TD gender that are equal to ASD gender label to 1 otherwise 0.
+    library(foreach)
+    filtGen <- foreach (i = 1:nMin) %do%
+      ifelse(Gdata[rownames(x2distForSel)[i],
+                   "Gender"] == Gdata[colnames(x2distForSel), "Gender"] , 1, 0)
+    
+    filtGen <-
+      matrix(unlist(filtGen),
+             ncol = ncol(x2distForSel),
+             byrow = T)
+    colnames(filtGen) <- rownames(Gdata[(nMin + 1):ncol(xDistFor), ])
+    rownames(filtGen) <- rownames(Gdata[1:nMin, ])
+    #filter TD handedness that are equal to ASD handedness label to 1 otherwise 0
+    filtHand <- foreach (i = 1:nMin) %do%
+      ifelse(Gdata[rownames(x2distForSel)[i],
+                   "Handedness"] == Gdata[colnames(x2distForSel), "Handedness"] , 1, 0)
+    
+    filtHand <-
+      matrix(unlist(filtHand),
+             ncol = ncol(x2distForSel),
+             byrow = T)
+    colnames(filtHand) <-
+      rownames(Gdata[(nMin + 1):ncol(xDistFor), ])
+    rownames(filtHand) <- rownames(Gdata[1:nMin, ])
+    
+    # Add these two conditions
+    filtGenHand <- filtGen + filtHand
+    rownames(filtGenHand) <- rownames(Gdata[1:nMin,])
+    colnames(filtGenHand) <-
+      rownames(Gdata[(nMin + 1):ncol(xDistFor), ])
+    
+    # Distance thereshold 
+    distFiltVal <- 0.84
+    
+    # Select TD subjects tha t qualify these 3 conditions.
+    filtGenHandDist <- matrix(
+      ifelse(
+        x2distForSel[,] <= distFiltVal & filtGenHand[,] == 2,
+        x2distForSel,
+        NA
+      ),
+      nrow = nMin ,
+      byrow = F
+    )
+    rownames(filtGenHandDist) <- rownames(Gdata[1:nMin, ])
+    colnames(filtGenHandDist) <-
+      rownames(Gdata[(nMin + 1):ncol(xDistFor), ])
+    
+    # Create distance matrix csv file.
+    outFileName = paste("output//x2DistMat", distFiltVal, ".csv", sep = "")
+    write.table(filtGenHandDist,
+                outFileName,
+                sep = ",",
+                col.names = TRUE)
+    
   # ASD Subjects that are selected manually 1-1 matching
-  ASD <-c("022A","038A","045A","056A","071A","082A","091A","092A","095A","096A","111A","115A","123A","131A","136A","138A",  
-          "141A","144A","147A","148A","150A","153A","155A","157A","160A","162A","167A","174A","175A","191A",  
-          "192A","194A","198A_V2", "205A","224A","225A","226A","405A","406A_V2", "409A","410A","413A","420A")
-  
+  ASD <-c("022A","038A","045A","056A","071A","082A","091A","092A","095A","096A","111A","115A",
+          "123A","131A","136A","138A","141A","144A","147A","148A","150A","153A","155A","157A",
+           "160A","162A","167A","174A","175A","191A","192A","194A","198A_V2",
+          "205A","209A","224A","225A","226A","405A","406A_V2", "409A","410A","413A",
+          "420A")
   # ASD Subjects that are selected manually 1-1 matching
   TD <- c("048C","049C","064C","065C","067C","078C","086C","090C","097C","098C","100C","101C","104C","106C","108C",   
            "109C","110C","119C","121C","122C","128C","133C","154C","165C","166C","168C","172C",
@@ -216,4 +283,5 @@ Gmatch <- function (data, matchList, nTree, method) {
   rownames(smdoneTone) <- "oneTone"
   smdoneTone <- as.table(smdoneTone)
   print(smdoneTone)
+  }
 }
