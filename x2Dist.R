@@ -12,7 +12,7 @@
 x2Dist <- function(tree, terminalNode, treeNum) {
   pars <- as.list(match.call())
   
-  # Identify terminal nodes
+  # Identify terminal nodes in the tree
   terNode <- nodeids(tree, terminal = TRUE)
   
   # How many subjects in each terminal node
