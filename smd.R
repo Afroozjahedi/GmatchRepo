@@ -1,13 +1,15 @@
 smd = function(Data,Var){
-  ASD = Data$group == 1 
+        ASD = Data$group == 1 
   pars <- as.list(match.call())
-  if (is.factor(Data[ASD,as.character(pars$Var)])){
+  #formula <-group ~ RMSD.PRE.censoring + Age + WASI.NVIQ +Gender + Handedness 
+    if (is.factor(Data[ASD,as.character(pars$Var)])){
     mASD = mean(as.numeric(Data[ASD,as.character(pars$Var)]),na.rm = TRUE)
     mTD = mean(as.numeric(Data[!ASD,as.character(pars$Var)]),na.rm = TRUE)
     varASD = var(as.numeric(Data[ASD,as.character(pars$Var)]),na.rm = TRUE)
     varTD = var(as.numeric(Data[!ASD,as.character(pars$Var)]),na.rm = TRUE)
     stdMeanDiff = (mASD - mTD)/(sqrt((varASD + varTD)/2))
-    cat("SMD",pars$Data,pars$Var,"=", stdMeanDiff,"\n")
+    #cat("SMD",pars$Data,pars$Var,"=", stdMeanDiff,"\n")
+    return(stdMeanDiff)
   }else {
   mASD = mean(Data[ASD,as.character(pars$Var)],na.rm = TRUE)
   mTD = mean(Data[!ASD,as.character(pars$Var)],na.rm = TRUE)
