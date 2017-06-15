@@ -9,8 +9,9 @@ library(optmatch)
 # Description: build a distance matrix based on random forest with 0-1 defnition or 
 # chi-square defnition.
 #==============================================================================
-
+#sink("sink-examp.txt")
 Gmatch <- function (data, formula, nTree, method, distance) {
+        sink()
         #==== setting parameters ====
         response <- all.vars(formula)[1]
         # response <- deparse(substitute(response))
@@ -18,7 +19,7 @@ Gmatch <- function (data, formula, nTree, method, distance) {
         #==== Cleaning data ====
         # It is important to have ASD first and then TD for distance matrix
         #?????????????????????????? how to not hard code variables.
-        
+#sink()        
         
         data[[response]] <- as.factor (data[[response]])
         
@@ -120,7 +121,7 @@ Gmatch <- function (data, formula, nTree, method, distance) {
                         nsplit = NULL,
                         minsplit = 20,
                         maxdepth = 10,
-                        minbucket = 10,
+                        minbucket = 5,
                         bootstrap = FALSE
                 )
         
@@ -205,83 +206,70 @@ Gmatch <- function (data, formula, nTree, method, distance) {
                 DM <- distForSel
         }
         #==== Methods ====
-        # 1- 1To3GH: 1-3 filtering subject on gender and handedness.
-        #           Based on distance percentile, certain threshold will be picked.
-        if (method == "1To3GH") {
-                #Tight matching on gender and handedness using certain distance thershold
-                
+        if (method == "opt-coars-exact") {
+                #=== Distance prepration ====
                 # ASD and TD distance only and label them.
                 x2distForSel <-
                         xDistFor[1:nMin, (nMin + 1):ncol(xDistFor)]
                 rownames(x2distForSel) <- rownames(Gdata[1:nMin, ])
                 colnames(x2distForSel) <-
-                        rownames(Gdata[(nMin + 1):ncol(xDistFor), ])
+                        rownames(Gdata[(nMin + 1):ncol(xDistFor),])
                 
-                #filter TD gender that are equal to ASD gender label to 1 otherwise 0.
+                # All continious variables of data,dimension and name
+                numData <-
+                        Gdata[, split(names(Gdata), sapply(Gdata, function(x)
+                                paste(class(x), collapse = " ")))$numeric]
+                nv <- dim(numData)[2]
+                vnames <- colnames(numData)
+                
+                #=== Discritize the selected var ===
+                for (i in (1:nv)) {
+                        tmp <- reduceVar(numData[[i]], "quantile")
+                        numData[[i]] <- tmp$x
+                        numData[[i]] <- as.factor(numData[[i]])
+                }
+                #=== Exact matching ====
                 library(foreach)
-                filtGen <- foreach (i = 1:nMin) %do%
-                        ifelse(Gdata[rownames(x2distForSel)[i],
-                                     "Gender"] == Gdata[colnames(x2distForSel), "Gender"] , 1, 0)
+                # Exact matching of ASD subjects based on categorical variables. If exact match, it's distance, otherwise 1.
+                filtDataCat <- foreach (i = 1:nMin) %do%
+                        ifelse(Gdata[rownames(x2distForSel)[i], "Gender"]
+                               == Gdata[colnames(x2distForSel), "Gender"] &
+                                       Gdata[rownames(x2distForSel)[i], "Handedness"]
+                               == Gdata[colnames(x2distForSel), "Handedness"]  , x2distForSel, 1)
                 
-                filtGen <-
-                        matrix(unlist(filtGen),
+                filtDataCat <-
+                        matrix(unlist(filtDataCat),
                                ncol = ncol(x2distForSel),
                                byrow = T)
-                colnames(filtGen) <-
-                        rownames(Gdata[(nMin + 1):ncol(xDistFor), ])
-                rownames(filtGen) <- rownames(Gdata[1:nMin, ])
-                #filter TD handedness that are equal to ASD handedness label to 1 otherwise 0
-                filtHand <- foreach (i = 1:nMin) %do%
-                        ifelse(Gdata[rownames(x2distForSel)[i],
-                                     "Handedness"] == Gdata[colnames(x2distForSel), "Handedness"] , 1, 0)
+                colnames(filtDataCat) <-
+                        rownames(Gdata[(nMin + 1):ncol(xDistFor),])
+                rownames(filtDataCat) <- rownames(Gdata[1:nMin,])
                 
-                filtHand <-
-                        matrix(
-                                unlist(filtHand),
-                                ncol = ncol(x2distForSel),
-                                byrow = T
-                        )
-                colnames(filtHand) <-
-                        rownames(Gdata[(nMin + 1):ncol(xDistFor), ])
-                rownames(filtHand) <- rownames(Gdata[1:nMin, ])
-                
-                # Add these two conditions
-                filtGenHand <- filtGen + filtHand
-                rownames(filtGenHand) <- rownames(Gdata[1:nMin,])
-                colnames(filtGenHand) <-
-                        rownames(Gdata[(nMin + 1):ncol(xDistFor), ])
-                
-                # Distance thereshold
-                distFiltVal <- 0.7
-                
-                # Select TD subjects tha t qualify these 3 conditions.
-                filtGenHandDist <- matrix(
+                # Exact matching of ASD subjects based on continious variables. If exact match, it's distance,otherwise 1.
+                 thr <- 100
+                 filtDataCont <- foreach (i = 1:nMin) %do%
                         ifelse(
-                                x2distForSel[,] <= distFiltVal & filtGenHand[,] == 2,
+                                numData[rownames(x2distForSel)[i], "RMSD.PRE.censoring"]
+                                == numData[colnames(x2distForSel), "RMSD.PRE.censoring"] &
+                                        numData[rownames(x2distForSel)[i], "Age"]
+                                == numData[colnames(x2distForSel), "Age"] &
+                                        numData[rownames(x2distForSel)[i], "WASI.NVIQ"]
+                                == numData[colnames(x2distForSel), "WASI.NVIQ"],
                                 x2distForSel,
-                                1
-                        ),
-                        nrow = nMin ,
-                        byrow = F
-                )
-                rownames(filtGenHandDist) <-
-                        rownames(Gdata[1:nMin, ])
-                colnames(filtGenHandDist) <-
-                        rownames(Gdata[(nMin + 1):ncol(xDistFor), ])
+                                thr
+                        )
                 
-                # Create distance matrix csv file.
-                outFileName = paste("output//x2DistMat",
-                                    distFiltVal,
-                                    ".csv",
-                                    sep = "")
-                write.table(
-                        filtGenHandDist,
-                        outFileName,
-                        sep = ",",
-                        col.names = TRUE
-                )
+                # Build a distance matrix based on exact matched.label cols and rows.
+                filtDataCont <- matrix(unlist(filtDataCont),
+                                       ncol = ncol(x2distForSel),
+                                       byrow = T)
+                colnames(filtDataCont) <-
+                        rownames(Gdata[(nMin + 1):ncol(xDistFor), ])
+                rownames(filtDataCont) <- rownames(Gdata[1:nMin, ])
+                write.csv(filtDataCont,file = "filtDataCont.csv")
+                #=== one-to-one optimal matching ====
                 library("optmatch")
-                DM <- filtGenHandDist
+                DM <- filtDataCont
                 optMatch <-
                         fullmatch(
                                 DM,
@@ -292,18 +280,213 @@ Gmatch <- function (data, formula, nTree, method, distance) {
                                 subclass.indices = NULL
                         )
                 matchSubj <- print(optMatch, grouped = T)
-                print(optMatch)
+                #print(optMatch)
                 print(summary(optMatch))
+                
+                #=== write output into a object and read it from a file ====
                 capture.output(print(optMatch, grouped = T), file = "subjMatch.txt")
                 subjMatch <- read.table("subjMatch.txt")
+                splitSubj <-
+                        do.call("rbind", strsplit(c(
+                                as.character(subjMatch$Group),
+                                as.character(subjMatch$Members)
+                        ), ","))
                 optData <-
-                        Gdata[c(as.character(subjMatch[[1]]),
-                                as.character(subjMatch[[2]])),]
-                #==== 1-1 optimal matching =====
-        } else if (method == "1-1") {
-                #==== Optimal matching ====
+                        Gdata[c(as.character(gsub(',', '', (subjMatch[[1]]))),
+                                as.character(subjMatch[[2]])), ]
+                # Set the matched data
+                matchedData <- optData
+                
+                #=== Tabling pvalues and SMD after matching ====
+                
+                pvalMotion <-
+                        (t.test(RMSD.PRE.censoring ~ group, data = matchedData))$p.value
+                pvalAge <-
+                        (t.test(Age ~ group, data = matchedData))$p.value
+                pvalNVIQ <-
+                        (t.test(WASI.NVIQ ~ group, data = matchedData))$p.value
+                pvalGender <-
+                        chisq.test(matchedData$group, matchedData$Gender)$p.value
+                pvalHandedness <-
+                        chisq.test(matchedData$group, matchedData$Handedness)$p.value
+                pvalsOpt <-
+                        matrix(c(
+                                pvalMotion,
+                                pvalAge,
+                                pvalNVIQ,
+                                pvalGender,
+                                pvalHandedness
+                        ),
+                        ncol = 5)
+                colnames(pvalsOpt) <-
+                        c("RMSD.PRE.censoring",
+                          "Age",
+                          "WASI.NVIQ",
+                          "Gender",
+                          "Handedness")
+                rownames(pvalsOpt) <- "Pvals"
+                pvalsOpt <- as.table(pvalsOpt)
+                print(pvalsOpt)
+                
+                # Calculate standardized mean difference
+                smdMotion <- smd(matchedData, RMSD.PRE.censoring)
+                smdAge <- smd(matchedData, "Age")
+                smdNVIQ <- smd(matchedData, "WASI.NVIQ")
+                smdGender <- smd(matchedData, "Gender")
+                smdHandedness <- smd(matchedData, "Handedness")
+                
+                # Tabling smd for output
+                smdOpt <-
+                        matrix(c(smdMotion, smdAge, smdNVIQ, smdGender, smdHandedness),
+                               ncol = 5)
+                colnames(smdOpt) <-
+                        c("RMSD.PRE.censoring",
+                          "Age",
+                          "WASI.NVIQ",
+                          "Gender",
+                          "Handedness")
+                rownames(smdOpt) <- "SMD"
+                smdOpt <- as.table(smdOpt)
+                print(smdOpt)
+                print(table(matchedData$group))
+                print(rownames(matchedData))
+        
+                #=== itteretive optimal matching ====
+                # Check SMD for all variables. if it is not below 10% keep improving 
+                while (abs(smdMotion) > 0.1 |
+                       abs(smdAge) > 0.1 |
+                       abs(smdNVIQ) > 0.1 |
+                       abs(smdGender) > 0.1  |
+                       abs(smdHandedness) > 0.1)
+                {
+                        #=== Obtain matched ASD subject distance ====
+                        distance <- NULL
+                        for (i in 1:(table(optData$group)[2])){
+                                distance <- c(distance,(DM[splitSubj[i,1],splitSubj[(i+(table(optData$group)[2])),1]]) )    
+                        }
+                        splitSubj <- data.frame(splitSubj,distance)
+                        
+                        # Find the name of ASD subject has the largest distance
+                        # subset(splitSubj,distance!=100,select = which.max(distance))
+                        # (subset(splitSubj,distance!=100,select =(distance)))
+                        maxSubjs <- (splitSubj[ splitSubj[,"distance"]!=100 ,]) 
+                        excSubj <- maxSubjs[which.max(maxSubjs[,2]),1]
+                        print(excSubj)
+                        #Get the list of ASD subject that partcipate in the matching
+                        allMatchSubj =splitSubj[1:(table(optData$group)[2]),1]
+                        # 
+                        # for (i in 1:(table(matchedData$group)[2])) {
+                        #         ASDdistance <-
+                        #                 c(ASDdistance, (DM[rownames((matchedData)[i,]),rownames(matchedData[(i +table(matchedData$group)[2]), ])]))
+                        # }
+                        # 
+                        # # Distance of matched ASD subjects
+                        # ASDdistance <- data.frame(subjId=(rownames(matchedData))[1:(table(matchedData$group))[2]], dist=ASDdistance)
+                        # 
+                        # #=== Find the largest distance ASD name that is not exclude due to exact matching.====
+                        # excSubj <- (ASDdistance[which.max(ASDdistance$dist!=thr),])$subjId
+                        # print(excSubj)
+                        # print(ASDdistance[excSubj,])
+                        # #Get the list of ASD subject that partcipate in the matching
+                        # allMatchSubj = rownames(matchedData[1:(table(matchedData$group)[2]), ])
+                        # 
+                        #remaining ASD subjects
+                        remainedASD <- as.character(allMatchSubj[allMatchSubj!= excSubj])
+                        print(remainedASD)
+                        
+                        #trimed distance matrix
+                        trimedDM <- DM[remainedASD,]
+                        
+                        #====Redo the optimal matching ====
+                        optMatch <-
+                                fullmatch(
+                                        trimedDM,
+                                        min.controls = 1,
+                                        max.controls = 1,
+                                        omit.fraction = NULL,
+                                        tol = 0.001,
+                                        subclass.indices = NULL
+                                )
+                        summary(optMatch)
+                        #print(optMatch, responseed = T)
+                        
+                        # #==== write the itteretive matched output to a text file ====
+                        capture.output(print(optMatch, grouped = T), file = "iterSubjMatch.txt")
+                        
+                        subjMatch <- read.table("iterSubjMatch.txt",header = T)
+                        splitSubj <- do.call("rbind",strsplit(c(as.character(subjMatch$Group),as.character(subjMatch$Members)), ","))
+                        optData <- Gdata[splitSubj, ]
+                        # capture.output(print(optMatch, grouped = T), file = "iterSubjMatch.txt")
+                        # subjMatch <- read.table("iterSubjMatch.txt")
+                        # optData <-
+                        #         Gdata[c(as.character(gsub(',', '', (subjMatch[[1]]))),
+                        #                 as.character(subjMatch[[2]])), ]
+                         matchedData <- optData
+                        #====  # Tabling pvalues and SMD after matching ====
+                        
+                        pvalMotion <-
+                                (t.test(RMSD.PRE.censoring ~ group, data = matchedData))$p.value
+                        pvalAge <-
+                                (t.test(Age ~ group, data = matchedData))$p.value
+                        pvalNVIQ <-
+                                (t.test(WASI.NVIQ ~ group, data = matchedData))$p.value
+                        pvalGender <-
+                                chisq.test(matchedData$group, matchedData$Gender)$p.value
+                        pvalHandedness <-
+                                chisq.test(matchedData$group, matchedData$Handedness)$p.value
+                        
+                        
+                        pvalsOpt <-
+                                matrix(c(
+                                        pvalMotion,
+                                        pvalAge,
+                                        pvalNVIQ,
+                                        pvalGender,
+                                        pvalHandedness
+                                ),
+                                ncol = 5)
+                        colnames(pvalsOpt) <-
+                                c("RMSD.PRE.censoring",
+                                  "Age",
+                                  "WASI.NVIQ",
+                                  "Gender",
+                                  "Handedness")
+                        rownames(pvalsOpt) <- "Pvals"
+                        pvalsOpt <- as.table(pvalsOpt)
+                        print(pvalsOpt)
+                        # Calculate standardized mean difference
+                        smdMotion <-
+                                smd(matchedData, RMSD.PRE.censoring)
+                        smdAge <- smd(matchedData, "Age")
+                        smdNVIQ <- smd(matchedData, "WASI.NVIQ")
+                        smdGender <- smd(matchedData, "Gender")
+                        smdHandedness <- smd(matchedData, "Handedness")
+                        
+                        # Tabling smd for output
+                        smdOpt <-
+                                matrix(c(
+                                        smdMotion,
+                                        smdAge,
+                                        smdNVIQ,
+                                        smdGender,
+                                        smdHandedness
+                                ),
+                                ncol = 5)
+                        colnames(smdOpt) <-
+                                c("RMSD.PRE.censoring",
+                                  "Age",
+                                  "WASI.NVIQ",
+                                  "Gender",
+                                  "Handedness")
+                        rownames(smdOpt) <- "SMD"
+                        smdOpt <- as.table(smdOpt)
+                        print(smdOpt)
+                        print(table(matchedData$group))
+                        
+                }
+        } else if (method == "opt-one-to-one") {
+                #=== Optimal one-to-one matching ====
                 library("optmatch")
-                # Optimal one-to-one matching
                 optMatch <-
                         fullmatch(
                                 DM,
@@ -314,15 +497,19 @@ Gmatch <- function (data, formula, nTree, method, distance) {
                                 subclass.indices = NULL
                         )
                 summary(optMatch)
-                print(optMatch, responseed = T)
+                #print(optMatch, responseed = T)
                 
-                # write output to a file to be used again as an obj in R
+                #=== write output to a file to be used again as an obj in R ====
                 capture.output(print(optMatch, grouped = T), file = "subjMatch.txt")
-                subjMatch <- read.table("subjMatch.txt",header = T)
-                splitSubj <- do.call("rbind",strsplit(c(as.character(subjMatch$Group),as.character(subjMatch$Members)), ","))
+                subjMatch <- read.table("subjMatch.txt", header = T)
+                splitSubj <-
+                        do.call("rbind", strsplit(c(
+                                as.character(subjMatch$Group),
+                                as.character(subjMatch$Members)
+                        ), ","))
                 optData <- Gdata[splitSubj, ]
                
-                #==== Tabling pvalues for output ====
+                #=== Tabling pvalues and SMD for output ====
                 pvalMotion <-
                         (t.test(RMSD.PRE.censoring ~ group, data = optData))$p.value
                 pvalAge <- (t.test(Age ~ group, data = optData))$p.value
@@ -358,7 +545,7 @@ Gmatch <- function (data, formula, nTree, method, distance) {
                 smdGender <- smd(optData, "Gender")
                 smdHandedness <- smd(optData, "Handedness")
                 
-                #==== Tabling smd for output ====
+                #===Tabling smd for output ===
                 smdOpt <-
                         matrix(c(smdMotion, smdAge, smdNVIQ, smdGender, smdHandedness),
                                ncol = 5)
@@ -374,23 +561,31 @@ Gmatch <- function (data, formula, nTree, method, distance) {
                 smdOpt
                 table(optData$group)
                 
+                #=== itteration ===== 
                 # Check SMD for all variables. if it is not below 10% keep improving
-                while (abs(smdMotion) > 0.1 | abs(smdAge) > 0.1| abs(smdNVIQ) > 0.1 | abs(smdGender) > 0.1  |abs(smdHandedness) > 0.1 ){
+                while (abs(smdMotion) > 0.1 | abs(smdAge) > 0.1| abs(smdNVIQ) > 0.1 | abs(smdGender) > 0.1  |abs(smdHandedness) > 0.1 )
+                        {
                         #= Can we improve SMD? First =
                         # who has the largest distance? 
                         distance <- NULL
                         for (i in 1:(table(optData$group)[2])){
                                 distance <- c(distance,(DM[as.character(splitSubj[i,1]),as.character(splitSubj[(i+(table(optData$group)[2])),1])]) )    
                         }
-                        splitSubj <- cbind(matrix(splitSubj,nrow = table(optData$group)[2]),distance)
+                        splitSubj <- data.frame(splitSubj,distance)
                         # Find the name of ASD subject has the largest distance
-                        excSubj <- (splitSubj[apply(splitSubj,2,which.max)$distance, ])[1]
+                        #excSubj <- (splitSubj[apply(splitSubj,2,which.max)$distance, ])[1]
                         
+                        maxSubjs <- (splitSubj[ splitSubj[,"distance"]!=100 ,]) 
+                        excSubj <- maxSubjs[which.max(maxSubjs[,2]),1]
+                        print(excSubj)
                         #Get the list of ASD subject that partcipate in the matching
-                        allMatchSubj =rownames(DM[splitSubj[1:(nrow(splitSubj)), 1], ])
+                        #allMatchSubj =rownames(DM[splitSubj[1:(nrow(splitSubj)), 1], ])
+                        allMatchSubj =splitSubj[1:(table(optData$group)[2]),1]
+                        
                         
                         #remaining ASD subjects
-                        remainedASD <- allMatchSubj[allMatchSubj!=excSubj ]
+                        remainedASD <- as.character(allMatchSubj[allMatchSubj!= excSubj])
+                        print(remainedASD)
                         
                         #trimed distance matrix
                         trimedDM <- DM[remainedASD,]
@@ -408,13 +603,13 @@ Gmatch <- function (data, formula, nTree, method, distance) {
                         summary(optMatch)
                         print(optMatch, responseed = T)
                         
-                        # write the output to a text file
+                        #==== write the itterated matched output to a text file ====
                         capture.output(print(optMatch, grouped = T), file = "subjMatch.txt")
                         
                         subjMatch <- read.table("subjMatch.txt",header = T)
                         splitSubj <- do.call("rbind",strsplit(c(as.character(subjMatch$Group),as.character(subjMatch$Members)), ","))
                         optData <- Gdata[splitSubj, ]
-                        #====  # Tabling pvalues and SMD after matching ====
+                        #==== Tabling pvalues and SMD after matching ====
                         
                         pvalMotion <-
                                 (t.test(RMSD.PRE.censoring ~ group, data = optData))$p.value
@@ -488,4 +683,6 @@ Gmatch <- function (data, formula, nTree, method, distance) {
         #        optData<- Gdata[c(matchASD,matchTD), ]
         
         }
-}
+      
+        }
+
