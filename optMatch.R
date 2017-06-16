@@ -484,7 +484,26 @@ Gmatch <- function (data, formula, nTree, method, distance) {
                         print(table(matchedData$group))
                         
                 }
-        } else if (method == "opt-one-to-one") {
+        }if (method == "opt-coars-exact-rev"){
+                library(fields)
+                motionDist <- rdist(Gdata$RMSD.PRE.censoring)
+                motionDist[lower.tri(motionDist)] <- NA
+                diag(motionDist) <- NA
+                motionDist<- data.frame(motionDist)
+                colnames(motionDist) <- rownames(Gdata)
+                rownames(motionDist) <- rownames(Gdata)
+                filtMotionDist <-motionDist[(motionDist[,]<=2),]
+                subset(motionDist,motionDist[,]<=2)
+                ifelse(motionDist, motionDist[,]>.2, NA)
+                
+                # distance matrix for age
+                ageDist <- rdist(Gdata$Age)
+                ageDist[lower.tri(ageDist)] <- NA
+                diag(ageDist) <- NA
+                colnames(ageDist) <- rownames(Gdata)
+                rownames(ageDist) <- rownames(Gdata)
+        } 
+        else if (method == "opt-one-to-one") {
                 #=== Optimal one-to-one matching ====
                 library("optmatch")
                 optMatch <-
