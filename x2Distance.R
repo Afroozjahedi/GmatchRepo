@@ -64,45 +64,45 @@ Gmatch <- function (data, formula, nTree, method) {
         plot(mydata)
         
         ##### variable pvalue before matching ####
-        
-        pvalNumeric <-
-                (lapply(Gdata[, which(sapply(Gdata, is.numeric))],
-                        function(x)
-                                (t.test(x ~ Gdata[[all.vars(formula)[1]]]))$p.value))
-        pvalFact <-
-                (lapply(Gdata[, which(sapply(Gdata, is.factor))],
-                        function(x)
-                                (chisq.test(Gdata[[all.vars(formula)[1]]], x))$p.value))
-        pval <- append(pvalNumeric, pvalFact)
-        pval[[4]] <- NULL
-        print(unlist(pval))
-        
-        # Calculate standardized mean difference
-        # debug(smd)
-        # smd(nonOutlierLowADOS,all.vars(formula)[[2]])
-        #
-        # smdNumeric <- (lapply(Gdata[, which(sapply(Gdata, is.numeric))],
-        #                        function(x) smd(Gdata, RMSD.PRE.censoring)))
-        #
-        smdMotion <- smd(Gdata, RMSD.PRE.censoring)
-        smdAge <- smd(Gdata, "Age")
-        smdNVIQ <- smd(Gdata, "WASI.NVIQ")
-        smdGender <- smd(Gdata, "Gender")
-        smdHandedness <- smd(Gdata, "Handedness")
-        
-        # Tabling smd for output
-        smdBef <-
-                matrix(c(smdMotion, smdAge, smdNVIQ, smdGender, smdHandedness),
-                       ncol = 5)
-        colnames(smdBef) <-
-                c("RMSD.PRE.censoring",
-                  "Age",
-                  "WASI.NVIQ",
-                  "Handedness",
-                  "Gender")
-        rownames(smdBef) <- "BEFORE"
-        smdBef <- as.table(smdBef)
-        smdBef
+        summaryGmatch(Gdata)
+        # pvalNumeric <-
+        #         (lapply(Gdata[, which(sapply(Gdata, is.numeric))],
+        #                 function(x)
+        #                         (t.test(x ~ Gdata[[all.vars(formula)[1]]]))$p.value))
+        # pvalFact <-
+        #         (lapply(Gdata[, which(sapply(Gdata, is.factor))],
+        #                 function(x)
+        #                         (chisq.test(Gdata[[all.vars(formula)[1]]], x))$p.value))
+        # pval <- append(pvalNumeric, pvalFact)
+        # pval[[4]] <- NULL
+        # print(unlist(pval))
+        # 
+        # # Calculate standardized mean difference
+        # # debug(smd)
+        # # smd(nonOutlierLowADOS,all.vars(formula)[[2]])
+        # #
+        # # smdNumeric <- (lapply(Gdata[, which(sapply(Gdata, is.numeric))],
+        # #                        function(x) smd(Gdata, RMSD.PRE.censoring)))
+        # #
+        # smdMotion <- smd(Gdata, RMSD.PRE.censoring)
+        # smdAge <- smd(Gdata, "Age")
+        # smdNVIQ <- smd(Gdata, "WASI.NVIQ")
+        # smdGender <- smd(Gdata, "Gender")
+        # smdHandedness <- smd(Gdata, "Handedness")
+        # 
+        # # Tabling smd for output
+        # smdBef <-
+        #         matrix(c(smdMotion, smdAge, smdNVIQ, smdGender, smdHandedness),
+        #                ncol = 5)
+        # colnames(smdBef) <-
+        #         c("RMSD.PRE.censoring",
+        #           "Age",
+        #           "WASI.NVIQ",
+        #           "Handedness",
+        #           "Gender")
+        # rownames(smdBef) <- "BEFORE"
+        # smdBef <- as.table(smdBef)
+        # smdBef
         ##### Random Forest growing ####
         set.seed(184684)
         ntrees <- nTree
@@ -290,58 +290,58 @@ Gmatch <- function (data, formula, nTree, method) {
                 hist(distFilt, main = "Number of times a subject is selected")
                 dataNewExaX2 <-
                         rbind (Gdata[remRowName, ], (Gdata[namesTD, ]))
-                
-                pvalHandedness <-
-                        chisq.test(dataNewExaX2$group, dataNewExaX2$Handedness)$p.value
-                pvalGender <-
-                        chisq.test(dataNewExaX2$group, dataNewExaX2$Gender)$p.value
-                pvalMotion <-
-                        (t.test(RMSD.PRE.censoring ~ group, data = dataNewExaX2))$p.value
-                pvalAge <-
-                        (t.test(Age ~ group, data = dataNewExaX2))$p.value
-                pvalNVIQ <-
-                        (t.test(WASI.NVIQ ~ group, data = dataNewExaX2))$p.value
-                
-                # Tabling pvalues for output
-                pvals1_3GH <-
-                        matrix(c(
-                                pvalMotion,
-                                pvalAge,
-                                pvalNVIQ,
-                                pvalGender,
-                                pvalHandedness
-                        ),
-                        ncol = 5)
-                colnames(pvals1_3GH) <-
-                        c("RMSD.PRE.censoring",
-                          "Age",
-                          "WASI.NVIQ",
-                          "Handedness",
-                          "Gender")
-                rownames(pvals1_3GH) <- "1-3GH"
-                pvals1_3GH <- as.table(pvals1_3GH)
-                print(pvals1_3GH)
-                
-                smdMotion <- smd(dataNewExaX2, RMSD.PRE.censoring)
-                smdAge <- smd(dataNewExaX2, Age)
-                smdNVIQ <- smd(dataNewExaX2, WASI.NVIQ)
-                smdGender <- smd(dataNewExaX2, Gender)
-                smdhandedness <- smd(dataNewExaX2, Handedness)
-                
-                # Tabling smd for output
-                smd1_3GH <-
-                        matrix(c(smdMotion, smdAge, smdNVIQ, smdGender, smdHandedness),
-                               ncol = 5)
-                colnames(smd1_3GH) <-
-                        c("RMSD.PRE.censoring",
-                          "Age",
-                          "WASI.NVIQ",
-                          "Handedness",
-                          "Gender")
-                rownames(smd1_3GH) <- "1_3GH"
-                smd1_3GH <- as.table(smd1_3GH)
-                print(smd1_3GH)
-                print(table(dataNewExaX2$group))
+                summaryGmatch(dataNewExaX2)
+                # pvalHandedness <-
+                #         chisq.test(dataNewExaX2$group, dataNewExaX2$Handedness)$p.value
+                # pvalGender <-
+                #         chisq.test(dataNewExaX2$group, dataNewExaX2$Gender)$p.value
+                # pvalMotion <-
+                #         (t.test(RMSD.PRE.censoring ~ group, data = dataNewExaX2))$p.value
+                # pvalAge <-
+                #         (t.test(Age ~ group, data = dataNewExaX2))$p.value
+                # pvalNVIQ <-
+                #         (t.test(WASI.NVIQ ~ group, data = dataNewExaX2))$p.value
+                # 
+                # # Tabling pvalues for output
+                # pvals1_3GH <-
+                #         matrix(c(
+                #                 pvalMotion,
+                #                 pvalAge,
+                #                 pvalNVIQ,
+                #                 pvalGender,
+                #                 pvalHandedness
+                #         ),
+                #         ncol = 5)
+                # colnames(pvals1_3GH) <-
+                #         c("RMSD.PRE.censoring",
+                #           "Age",
+                #           "WASI.NVIQ",
+                #           "Handedness",
+                #           "Gender")
+                # rownames(pvals1_3GH) <- "1-3GH"
+                # pvals1_3GH <- as.table(pvals1_3GH)
+                # print(pvals1_3GH)
+                # 
+                # smdMotion <- smd(dataNewExaX2, RMSD.PRE.censoring)
+                # smdAge <- smd(dataNewExaX2, Age)
+                # smdNVIQ <- smd(dataNewExaX2, WASI.NVIQ)
+                # smdGender <- smd(dataNewExaX2, Gender)
+                # smdhandedness <- smd(dataNewExaX2, Handedness)
+                # 
+                # # Tabling smd for output
+                # smd1_3GH <-
+                #         matrix(c(smdMotion, smdAge, smdNVIQ, smdGender, smdHandedness),
+                #                ncol = 5)
+                # colnames(smd1_3GH) <-
+                #         c("RMSD.PRE.censoring",
+                #           "Age",
+                #           "WASI.NVIQ",
+                #           "Handedness",
+                #           "Gender")
+                # rownames(smd1_3GH) <- "1_3GH"
+                # smd1_3GH <- as.table(smd1_3GH)
+                # print(smd1_3GH)
+                # print(table(dataNewExaX2$group))
                 
         } else if (method == "1To3Dist") {
                 ### x2-defined distance using 1-3 match
@@ -373,54 +373,55 @@ Gmatch <- function (data, formula, nTree, method) {
                         rbind (Gdata[1:nMin,], (Gdata[rownames(distCandid),]))
                 
                 # 1-3 matching #
-                pvalHandedness <-
-                        chisq.test(dataNew1to3X2$group, dataNew1to3X2$Handedness)$p.value
-                pvalGender <-
-                        chisq.test(dataNew1to3X2$group, dataNew1to3X2$Gender)$p.value
-                pvalMotion <-
-                        (t.test(RMSD.PRE.censoring ~ group, data = dataNew1to3X2))$p.value
-                pvalAge <- (t.test(Age ~ group, data = dataNew1to3X2))$p.value
-                pvalNVIQ <-
-                        (t.test(WASI.NVIQ ~ group, data = dataNew1to3X2))$p.value
-                pvals1_3 <-
-                        matrix(c(
-                                pvalMotion,
-                                pvalAge,
-                                pvalNVIQ,
-                                pvalGender,
-                                pvalHandedness
-                        ),
-                        ncol = 5)
-                colnames(pvals1_3) <-
-                        c("RMSD.PRE.censoring",
-                          "Age",
-                          "WASI.NVIQ",
-                          "Gender",
-                          "Handedness"
-                          )
-                rownames(pvals1_3) <- "1-3"
-                pvals1_3 <- as.table(pvals1_3)
-                print(pvals1_3)
-                
-                
-                smdMotion <- smd(dataNew1to3X2, RMSD.PRE.censoring)
-                smdAge <- smd(dataNew1to3X2, Age)
-                smdNVIQ <- smd(dataNew1to3X2, WASI.NVIQ)
-                smdGender <- smd(dataNew1to3X2, Gender)
-                smdhandedness <- smd(dataNew1to3X2, Handedness)
-                smd1_3 <-
-                        matrix(c(smdMotion, smdAge, smdNVIQ, smdGender, smdHandedness),
-                               ncol = 5)
-                colnames(smd1_3) <-
-                        c("RMSD.PRE.censoring",
-                          "Age",
-                          "WASI.NVIQ",
-                          "Gender",
-                          "Handedness"
-                          )
-                rownames(smd1_3) <- "1_3"
-                smd1_3 <- as.table(smd1_3)
-                print(smd1_3)
+                summaryGmatch(dataNew1to3X2)
+                # pvalHandedness <-
+                #         chisq.test(dataNew1to3X2$group, dataNew1to3X2$Handedness)$p.value
+                # pvalGender <-
+                #         chisq.test(dataNew1to3X2$group, dataNew1to3X2$Gender)$p.value
+                # pvalMotion <-
+                #         (t.test(RMSD.PRE.censoring ~ group, data = dataNew1to3X2))$p.value
+                # pvalAge <- (t.test(Age ~ group, data = dataNew1to3X2))$p.value
+                # pvalNVIQ <-
+                #         (t.test(WASI.NVIQ ~ group, data = dataNew1to3X2))$p.value
+                # pvals1_3 <-
+                #         matrix(c(
+                #                 pvalMotion,
+                #                 pvalAge,
+                #                 pvalNVIQ,
+                #                 pvalGender,
+                #                 pvalHandedness
+                #         ),
+                #         ncol = 5)
+                # colnames(pvals1_3) <-
+                #         c("RMSD.PRE.censoring",
+                #           "Age",
+                #           "WASI.NVIQ",
+                #           "Gender",
+                #           "Handedness"
+                #           )
+                # rownames(pvals1_3) <- "1-3"
+                # pvals1_3 <- as.table(pvals1_3)
+                # print(pvals1_3)
+                # 
+                # 
+                # smdMotion <- smd(dataNew1to3X2, RMSD.PRE.censoring)
+                # smdAge <- smd(dataNew1to3X2, Age)
+                # smdNVIQ <- smd(dataNew1to3X2, WASI.NVIQ)
+                # smdGender <- smd(dataNew1to3X2, Gender)
+                # smdhandedness <- smd(dataNew1to3X2, Handedness)
+                # smd1_3 <-
+                #         matrix(c(smdMotion, smdAge, smdNVIQ, smdGender, smdHandedness),
+                #                ncol = 5)
+                # colnames(smd1_3) <-
+                #         c("RMSD.PRE.censoring",
+                #           "Age",
+                #           "WASI.NVIQ",
+                #           "Gender",
+                #           "Handedness"
+                #           )
+                # rownames(smd1_3) <- "1_3"
+                # smd1_3 <- as.table(smd1_3)
+                # print(smd1_3)
                 print(table(dataNew1to3X2$group))
                 subjectList <- rownames(dataNew1to3X2)
                 capture.output(subjectList, file = "subjList.csv")
@@ -480,26 +481,27 @@ Gmatch <- function (data, formula, nTree, method) {
                         rbind (Gdata[1:nMin,], (Gdata [rownames(DFPCand),]))
                 
                 #### p-values after distance within the calipar matching ###
-                chisq.test(data1To3Caliper$group, data1To3Caliper$Handedness)
-                chisq.test(data1To3Caliper$group, data1To3Caliper$Gender)
-                pvalMotion <-
-                        (t.test(RMSD.PRE.censoring ~ group, data = data1To3Caliper))$p.value
-                pvalAge <- (t.test(Age ~ group, data = data1To3Caliper))$p.value
-                pvalNVIQ <-
-                        (t.test(WASI.NVIQ ~ group, data = data1To3Caliper))$p.value
-                
-                DDFP <-
-                        printPval(pvalMotion, "data1To3Caliper$RMSD.PRE.censoring")
-                EDFP <- printPval(pvalAge, "data1To3Caliper$Age")
-                GDFP <- printPval(pvalNVIQ, "data1To3Caliper$WASI.NVIQ")
-                JDFP <- printPval(pvalHandedness, "data1To3Caliper$handedness")
-                KDFP <- printPval(pvalGender, "data1To3Caliper$Gender")
-                
-                smdMotion <- smd(data1To3Caliper, RMSD.PRE.censoring)
-                smdAge <- smd(data1To3Caliper, Age)
-                smdNVIQ <- smd(data1To3Caliper, WASI.NVIQ)
-                smdGender <- smd(data1To3Caliper, Gender)
-                smdhandedness <- smd(data1To3Caliper, Handedness)
+                summaryGmatch(data1To3Caliper)
+                # chisq.test(data1To3Caliper$group, data1To3Caliper$Handedness)
+                # chisq.test(data1To3Caliper$group, data1To3Caliper$Gender)
+                # pvalMotion <-
+                #         (t.test(RMSD.PRE.censoring ~ group, data = data1To3Caliper))$p.value
+                # pvalAge <- (t.test(Age ~ group, data = data1To3Caliper))$p.value
+                # pvalNVIQ <-
+                #         (t.test(WASI.NVIQ ~ group, data = data1To3Caliper))$p.value
+                # 
+                # DDFP <-
+                #         printPval(pvalMotion, "data1To3Caliper$RMSD.PRE.censoring")
+                # EDFP <- printPval(pvalAge, "data1To3Caliper$Age")
+                # GDFP <- printPval(pvalNVIQ, "data1To3Caliper$WASI.NVIQ")
+                # JDFP <- printPval(pvalHandedness, "data1To3Caliper$handedness")
+                # KDFP <- printPval(pvalGender, "data1To3Caliper$Gender")
+                # 
+                # smdMotion <- smd(data1To3Caliper, RMSD.PRE.censoring)
+                # smdAge <- smd(data1To3Caliper, Age)
+                # smdNVIQ <- smd(data1To3Caliper, WASI.NVIQ)
+                # smdGender <- smd(data1To3Caliper, Gender)
+                # smdhandedness <- smd(data1To3Caliper, Handedness)
                 print (table(data1To3Caliper$group))
                 
         }
@@ -519,44 +521,45 @@ Gmatch <- function (data, formula, nTree, method) {
                 dataNewInv <- rbind(Gdata[1:(nMin), ], Gdata[candidInv, ])
                 
                 #### p-values after inverse distance matching ###
-                chisq.test(dataNewInv$group, dataNewInv$Handedness)
-                chisq.test(dataNewInv$group, dataNewInv$Gender)
-                pvalMotion <-
-                        (t.test(RMSD.PRE.censoring ~ group, data = dataNewInv))$p.value
-                pvalAge <- (t.test(Age ~ group, data = dataNewInv))$p.value
-                pvalNVIQ <- (t.test(WASI.NVIQ ~ group, data = dataNewInv))$p.value
-                
-                DDFPB <- printPval(pvalMotion, "dataNewInv$RMSD.PRE.censoring")
-                EDFPB <- printPval(pvalAge, "dataNewInv$Age")
-                GDFPB <- printPval(pvalNVIQ, "dataNewInv$WASI.NVIQ")
-                JDFPB <- printPval(pvalHandedness, "dataNewInv$handedness")
-                KDFPB <- printPval(pvalGender, "dataNewInv$Gender")
-                
-                smdMotion <- smd(dataNewInv, RMSD.PRE.censoring)
-                smdAge <- smd(dataNewInv, Age)
-                smdNVIQ <- smd(dataNewInv, WASI.NVIQ)
-                smdGender <- smd(dataNewInv, Gender)
-                smdhandedness <- smd(dataNewInv, Handedness)
-                table(dataNewInv$group)
-                
-                pvalsInv <-
-                        matrix(c(
-                                pvalMotion,
-                                pvalAge,
-                                pvalNVIQ,
-                                pvalGender,
-                                pvalHandedness
-                        ),
-                        ncol = 5)
-                colnames(pvalsInv) <-
-                        c("RMSD.PRE.censoring",
-                          "Age",
-                          "WASI.NVIQ",
-                          "Handedness",
-                          "Gender")
-                rownames(pvalsInv) <- "Inverse"
-                pvalsInv <- as.table(pvalsInv)
-                pvalsInv
-                rbind(pvals, pvalsInv)
+                summaryGmatch(dataNewInv)
+                # chisq.test(dataNewInv$group, dataNewInv$Handedness)
+                # chisq.test(dataNewInv$group, dataNewInv$Gender)
+                # pvalMotion <-
+                #         (t.test(RMSD.PRE.censoring ~ group, data = dataNewInv))$p.value
+                # pvalAge <- (t.test(Age ~ group, data = dataNewInv))$p.value
+                # pvalNVIQ <- (t.test(WASI.NVIQ ~ group, data = dataNewInv))$p.value
+                # 
+                # DDFPB <- printPval(pvalMotion, "dataNewInv$RMSD.PRE.censoring")
+                # EDFPB <- printPval(pvalAge, "dataNewInv$Age")
+                # GDFPB <- printPval(pvalNVIQ, "dataNewInv$WASI.NVIQ")
+                # JDFPB <- printPval(pvalHandedness, "dataNewInv$handedness")
+                # KDFPB <- printPval(pvalGender, "dataNewInv$Gender")
+                # 
+                # smdMotion <- smd(dataNewInv, RMSD.PRE.censoring)
+                # smdAge <- smd(dataNewInv, Age)
+                # smdNVIQ <- smd(dataNewInv, WASI.NVIQ)
+                # smdGender <- smd(dataNewInv, Gender)
+                # smdhandedness <- smd(dataNewInv, Handedness)
+                # table(dataNewInv$group)
+                # 
+                # pvalsInv <-
+                #         matrix(c(
+                #                 pvalMotion,
+                #                 pvalAge,
+                #                 pvalNVIQ,
+                #                 pvalGender,
+                #                 pvalHandedness
+                #         ),
+                #         ncol = 5)
+                # colnames(pvalsInv) <-
+                #         c("RMSD.PRE.censoring",
+                #           "Age",
+                #           "WASI.NVIQ",
+                #           "Handedness",
+                #           "Gender")
+                # rownames(pvalsInv) <- "Inverse"
+                # pvalsInv <- as.table(pvalsInv)
+                # pvalsInv
+                # rbind(pvals, pvalsInv)
         }
 }

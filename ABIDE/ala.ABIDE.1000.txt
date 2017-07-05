@@ -1,0 +1,622 @@
+
+FALSE  TRUE 
+    1   493 
+
+  1   2 
+189 304 
+debugging in: Gmatch(SelAbideData, form, 10, "opt-one-to-one", "chi")
+debug at optMatch.R#15: {
+    response <- all.vars(formula)[1]
+    data[[response]]
+    data[[response]] <- as.factor(data[[response]])
+    table(data[[response]])
+    complete.cases(data)
+    outlierVal <- mean(data$RMSD) + 3 * sd(data$RMSD)
+    Gdata <- data[which(data$RMSD <= outlierVal), all.vars(formula)]
+    rownames(Gdata) <- data[, "SUB_ID"]
+    table(Gdata[[response]])
+    outliers <- as.character(data[which(data$RMSD >= outlierVal), 
+        ]$subj)
+    cat("subjects with extreme motion are", outliers, "\n")
+    summaryGmatch(Gdata)
+    ntrees <- nTree
+    rfRF100 <- rfConst(ntrees = ntrees, formula = form, training = Gdata, 
+        search = "greedy", method = "class", split = "gini", 
+        mtry = 3, nsplit = NULL, minsplit = 20, maxdepth = 10, 
+        minbucket = 5, bootstrap = FALSE)
+    ASD <- Gdata$GROUP == 1
+    if (NROW(Gdata[ASD, ]) < NROW(Gdata[!ASD, ])) {
+        (nMin = NROW(Gdata[ASD, ]))
+    }
+    else {
+        nMin <- NROW(Gdata[!ASD, ])
+    }
+    if (distance == "chi") {
+        nodeResponse <- sapply(rfRF100, function(x) {
+            predict(x$tree, newdata = Gdata, type = "node")
+        })
+        sumXDistMat = matrix(0, nrow = NROW(nodeResponse), ncol = NROW(nodeResponse))
+        colnames(sumXDistMat) <- rownames(nodeResponse)
+        rownames(sumXDistMat) <- rownames(nodeResponse)
+        ntrees <- nTree
+        for (treeNum in 1:ntrees) {
+            sumXDistMat <- sumXDistMat + x2Dist(rfRF100[[treeNum]]$tree, 
+                nodeResponse, treeNum)
+        }
+        xDistFor <- sumXDistMat/ntrees
+        rownames(xDistFor) <- rownames(Gdata)
+        colnames(xDistFor) <- rownames(Gdata)
+        x2distForSel <- xDistFor[1:nMin, (nMin + 1):ncol(xDistFor)]
+        rownames(x2distForSel) <- rownames(Gdata[1:nMin, ])
+        colnames(x2distForSel) <- rownames(Gdata[(nMin + 1):ncol(xDistFor), 
+            ])
+        DM <- x2distForSel
+    }
+    else if (distance == "0-1") {
+        nodeResponse <- sapply(rfRF100, function(x) {
+            predict(x$tree, newdata = Gdata, type = "node")
+        })
+        distMat <- matrix(ntrees, nrow = NROW(nodeResponse), 
+            ncol = NROW(nodeResponse))
+        for (tree in 1:ntrees) {
+            for (row in 1:NROW(nodeResponse)) {
+                distMat[, row] <- distMat[, row] - (nodeResponse[row, 
+                  tree] == nodeResponse[, tree])
+            }
+        }
+        distForest <- distMat/ntrees
+        rownames(distForest) <- rownames(Gdata)
+        colnames(distForest) <- rownames(Gdata)
+        distForSel <- distForest[1:nMin, (nMin + 1):ncol(distForest)]
+        rownames(distForSel) <- rownames(Gdata[1:nMin, ])
+        colnames(distForSel) <- rownames(Gdata[(nMin + 1):ncol(distForest), 
+            ])
+        DM <- distForSel
+    }
+    if (method == "opt-coars-exact") {
+        x2distForSel <- xDistFor[1:nMin, (nMin + 1):ncol(xDistFor)]
+        rownames(x2distForSel) <- rownames(Gdata[1:nMin, ])
+        colnames(x2distForSel) <- rownames(Gdata[(nMin + 1):ncol(xDistFor), 
+            ])
+        numData <- Gdata[, split(names(Gdata), sapply(Gdata, 
+            function(x) paste(class(x), collapse = " ")))$numeric]
+        nv <- dim(numData)[2]
+        vnames <- colnames(numData)
+        for (i in (1:nv)) {
+            tmp <- reduceVar(numData[[i]], "quantile")
+            numData[[i]] <- tmp$x
+            numData[[i]] <- as.factor(numData[[i]])
+        }
+        library(foreach)
+        filtDataCat <- foreach(i = 1:nMin) %do% ifelse(Gdata[rownames(x2distForSel)[i], 
+            "Gender"] == Gdata[colnames(x2distForSel), "Gender"] & 
+            Gdata[rownames(x2distForSel)[i], "Handedness"] == 
+                Gdata[colnames(x2distForSel), "Handedness"], 
+            x2distForSel, 1)
+        filtDataCat <- matrix(unlist(filtDataCat), ncol = ncol(x2distForSel), 
+            byrow = T)
+        colnames(filtDataCat) <- rownames(Gdata[(nMin + 1):ncol(xDistFor), 
+            ])
+        rownames(filtDataCat) <- rownames(Gdata[1:nMin, ])
+        thr <- 100
+        filtDataCont <- foreach(i = 1:nMin) %do% ifelse(numData[rownames(x2distForSel)[i], 
+            "RMSD"] == numData[colnames(x2distForSel), "RMSD"] & 
+            numData[rownames(x2distForSel)[i], "Age"] == numData[colnames(x2distForSel), 
+                "Age"] & numData[rownames(x2distForSel)[i], "WASI.NVIQ"] == 
+            numData[colnames(x2distForSel), "WASI.NVIQ"], x2distForSel, 
+            thr)
+        filtDataCont <- matrix(unlist(filtDataCont), ncol = ncol(x2distForSel), 
+            byrow = T)
+        colnames(filtDataCont) <- rownames(Gdata[(nMin + 1):ncol(xDistFor), 
+            ])
+        rownames(filtDataCont) <- rownames(Gdata[1:nMin, ])
+        write.csv(filtDataCont, file = "filtDataCont.csv")
+        library("optmatch")
+        DM <- filtDataCont
+        optMatch <- fullmatch(DM, min.controls = 1, max.controls = 1, 
+            omit.fraction = NULL, tol = 0.001, subclass.indices = NULL)
+        matchSubj <- print(optMatch, grouped = T)
+        print(summary(optMatch))
+        capture.output(print(optMatch, grouped = T), file = "subjMatch.txt")
+        subjMatch <- read.table("subjMatch.txt")
+        splitSubj <- do.call("rbind", strsplit(c(as.character(subjMatch$Group), 
+            as.character(subjMatch$Members)), ","))
+        optData <- Gdata[c(as.character(gsub(",", "", (subjMatch[[1]]))), 
+            as.character(subjMatch[[2]])), ]
+        matchedData <- optData
+        pvalMotion <- (t.test(RMSD ~ group, data = matchedData))$p.value
+        pvalAge <- (t.test(Age ~ group, data = matchedData))$p.value
+        pvalNVIQ <- (t.test(WASI.NVIQ ~ group, data = matchedData))$p.value
+        pvalGender <- chisq.test(matchedData$group, matchedData$Gender)$p.value
+        pvalHandedness <- chisq.test(matchedData$group, matchedData$Handedness)$p.value
+        pvalsOpt <- matrix(c(pvalMotion, pvalAge, pvalNVIQ, pvalGender, 
+            pvalHandedness), ncol = 5)
+        colnames(pvalsOpt) <- c("RMSD", "Age", "WASI.NVIQ", "Gender", 
+            "Handedness")
+        rownames(pvalsOpt) <- "Pvals"
+        pvalsOpt <- as.table(pvalsOpt)
+        print(pvalsOpt)
+        smdMotion <- smd(matchedData, RMSD)
+        smdAge <- smd(matchedData, "Age")
+        smdNVIQ <- smd(matchedData, "WASI.NVIQ")
+        smdGender <- smd(matchedData, "Gender")
+        smdHandedness <- smd(matchedData, "Handedness")
+        smdOpt <- matrix(c(smdMotion, smdAge, smdNVIQ, smdGender, 
+            smdHandedness), ncol = 5)
+        colnames(smdOpt) <- c("RMSD", "Age", "WASI.NVIQ", "Gender", 
+            "Handedness")
+        rownames(smdOpt) <- "SMD"
+        smdOpt <- as.table(smdOpt)
+        print(smdOpt)
+        print(table(matchedData$group))
+        print(rownames(matchedData))
+        while (abs(smdMotion) > 0.1 | abs(smdAge) > 0.1 | abs(smdNVIQ) > 
+            0.1 | abs(smdGender) > 0.1 | abs(smdHandedness) > 
+            0.1) {
+            distance <- NULL
+            for (i in 1:(table(optData$group)[2])) {
+                distance <- c(distance, (DM[splitSubj[i, 1], 
+                  splitSubj[(i + (table(optData$group)[2])), 
+                    1]]))
+            }
+            splitSubj <- data.frame(splitSubj, distance)
+            maxSubjs <- (splitSubj[splitSubj[, "distance"] != 
+                100, ])
+            excSubj <- maxSubjs[which.max(maxSubjs[, 2]), 1]
+            print(excSubj)
+            allMatchSubj = splitSubj[1:(table(optData$group)[2]), 
+                1]
+            remainedASD <- as.character(allMatchSubj[allMatchSubj != 
+                excSubj])
+            print(remainedASD)
+            trimedDM <- DM[remainedASD, ]
+            optMatch <- fullmatch(trimedDM, min.controls = 1, 
+                max.controls = 1, omit.fraction = NULL, tol = 0.001, 
+                subclass.indices = NULL)
+            summary(optMatch)
+            capture.output(print(optMatch, grouped = T), file = "iterSubjMatch.txt")
+            subjMatch <- read.table("iterSubjMatch.txt", header = T)
+            splitSubj <- do.call("rbind", strsplit(c(as.character(subjMatch$Group), 
+                as.character(subjMatch$Members)), ","))
+            optData <- Gdata[splitSubj, ]
+            matchedData <- optData
+            summaryGmatch(optData)
+        }
+    }
+    else if (method == "opt-coars-exact-rev") {
+        library(fields)
+        motionDist <- rdist(Gdata$RMSD)
+        motionDist[lower.tri(motionDist)] <- NA
+        diag(motionDist) <- NA
+        colnames(motionDist) <- rownames(Gdata)
+        rownames(motionDist) <- rownames(Gdata)
+        motionDist <- motionDist[1:nMin, (nMin + 1):nrow(Gdata)]
+        filtMotionDist <- motionDist[, ] < 0.151
+        ageDist <- rdist(Gdata$Age)
+        ageDist[lower.tri(ageDist)] <- NA
+        diag(ageDist) <- NA
+        colnames(ageDist) <- rownames(Gdata)
+        rownames(ageDist) <- rownames(Gdata)
+        ageDist <- ageDist[1:nMin, (nMin + 1):nrow(Gdata)]
+        filtAgeDist <- ageDist[, ] < 9.9
+        combineExactDist <- filtAgeDist & filtMotionDist
+        combineExactDist <- ifelse(combineExactDist, DM, 10)
+        a <- iterOpt(combineExactDist, Gdata)
+    }
+    else if (method == "opt-one-to-one") {
+        library("optmatch")
+        optMatch <- fullmatch(DM, min.controls = 1, max.controls = 1, 
+            omit.fraction = NULL, tol = 0.001, subclass.indices = NULL)
+        summary(optMatch)
+        capture.output(print(optMatch, grouped = T), file = "subjMatch.txt")
+        subjMatch <- read.table("subjMatch.txt", header = T)
+        splitSubj <- do.call("rbind", strsplit(c(as.character(subjMatch$Group), 
+            as.character(subjMatch$Members)), ","))
+        optData <- Gdata[splitSubj, ]
+        S <- summaryGmatch(optData)
+        while (abs(S$smdMotion) > 0.1 | abs(S$smdAge) > 0.1 | 
+            abs(S$smdFIQ) > 0.1) {
+            distance <- NULL
+            for (i in 1:(table(optData$GROUP)[2])) {
+                distance <- c(distance, (DM[as.character(splitSubj[i, 
+                  1]), as.character(splitSubj[(i + (table(optData$GROUP)[2])), 
+                  1])]))
+            }
+            splitSubj <- data.frame(splitSubj, distance)
+            maxSubjs <- (splitSubj[splitSubj[, "distance"] != 
+                100, ])
+            excSubj <- maxSubjs[which.max(maxSubjs[, 2]), 1]
+            print(excSubj)
+            allMatchSubj = splitSubj[1:(table(optData$GROUP)[2]), 
+                1]
+            remainedASD <- as.character(allMatchSubj[allMatchSubj != 
+                excSubj])
+            trimedDM <- DM[remainedASD, ]
+            optMatch <- fullmatch(trimedDM, min.controls = 1, 
+                max.controls = 1, omit.fraction = NULL, tol = 0.001, 
+                subclass.indices = NULL)
+            summary(optMatch)
+            capture.output(print(optMatch, grouped = T), file = "subjMatch.txt")
+            subjMatch <- read.table("subjMatch.txt", header = T)
+            splitSubj <- do.call("rbind", strsplit(c(as.character(subjMatch$Group), 
+                as.character(subjMatch$Members)), ","))
+            optData <- Gdata[splitSubj, ]
+            S <- summaryGmatch(optData)
+        }
+    }
+    proc.time() - ptm
+    sink()
+}
+debug at optMatch.R#17: response <- all.vars(formula)[1]
+debug at optMatch.R#19: data[[response]]
+debug at optMatch.R#25: data[[response]] <- as.factor(data[[response]])
+debug at optMatch.R#28: table(data[[response]])
+debug at optMatch.R#31: complete.cases(data)
+debug at optMatch.R#33: outlierVal <- mean(data$RMSD) + 3 * sd(data$RMSD)
+debug at optMatch.R#37: Gdata <- data[which(data$RMSD <= outlierVal), all.vars(formula)]
+debug at optMatch.R#40: rownames(Gdata) <- data[, "SUB_ID"]
+debug at optMatch.R#43: table(Gdata[[response]])
+debug at optMatch.R#46: outliers <- as.character(data[which(data$RMSD >= outlierVal), 
+    ]$subj)
+debug at optMatch.R#48: cat("subjects with extreme motion are", outliers, "\n")
+subjects with extreme motion are  
+debug at optMatch.R#72: summaryGmatch(Gdata)
+              RMSD          Age          FIQ
+Pvals 4.378478e-03 5.013927e-02 2.067699e-12
+          RMSD        AGE        FIQ
+SMD  0.2687440  0.1827382 -0.6998579
+
+  1   2 
+189 304 
+                RMSD          Age          FIQ
+meanASD   0.08918684  12.39123693 103.60846561
+meanTD    0.07959074  11.87506680 113.79276316
+debug at optMatch.R#76: ntrees <- nTree
+debug at optMatch.R#79: rfRF100 <- rfConst(ntrees = ntrees, formula = form, training = Gdata, 
+    search = "greedy", method = "class", split = "gini", mtry = 3, 
+    nsplit = NULL, minsplit = 20, maxdepth = 10, minbucket = 5, 
+    bootstrap = FALSE)
+debug at optMatch.R#98: ASD <- Gdata$GROUP == 1
+debug at optMatch.R#99: if (NROW(Gdata[ASD, ]) < NROW(Gdata[!ASD, ])) {
+    (nMin = NROW(Gdata[ASD, ]))
+} else {
+    nMin <- NROW(Gdata[!ASD, ])
+}
+debug at optMatch.R#100: (nMin = NROW(Gdata[ASD, ]))
+debug at optMatch.R#105: if (distance == "chi") {
+    nodeResponse <- sapply(rfRF100, function(x) {
+        predict(x$tree, newdata = Gdata, type = "node")
+    })
+    sumXDistMat = matrix(0, nrow = NROW(nodeResponse), ncol = NROW(nodeResponse))
+    colnames(sumXDistMat) <- rownames(nodeResponse)
+    rownames(sumXDistMat) <- rownames(nodeResponse)
+    ntrees <- nTree
+    for (treeNum in 1:ntrees) {
+        sumXDistMat <- sumXDistMat + x2Dist(rfRF100[[treeNum]]$tree, 
+            nodeResponse, treeNum)
+    }
+    xDistFor <- sumXDistMat/ntrees
+    rownames(xDistFor) <- rownames(Gdata)
+    colnames(xDistFor) <- rownames(Gdata)
+    x2distForSel <- xDistFor[1:nMin, (nMin + 1):ncol(xDistFor)]
+    rownames(x2distForSel) <- rownames(Gdata[1:nMin, ])
+    colnames(x2distForSel) <- rownames(Gdata[(nMin + 1):ncol(xDistFor), 
+        ])
+    DM <- x2distForSel
+} else if (distance == "0-1") {
+    nodeResponse <- sapply(rfRF100, function(x) {
+        predict(x$tree, newdata = Gdata, type = "node")
+    })
+    distMat <- matrix(ntrees, nrow = NROW(nodeResponse), ncol = NROW(nodeResponse))
+    for (tree in 1:ntrees) {
+        for (row in 1:NROW(nodeResponse)) {
+            distMat[, row] <- distMat[, row] - (nodeResponse[row, 
+                tree] == nodeResponse[, tree])
+        }
+    }
+    distForest <- distMat/ntrees
+    rownames(distForest) <- rownames(Gdata)
+    colnames(distForest) <- rownames(Gdata)
+    distForSel <- distForest[1:nMin, (nMin + 1):ncol(distForest)]
+    rownames(distForSel) <- rownames(Gdata[1:nMin, ])
+    colnames(distForSel) <- rownames(Gdata[(nMin + 1):ncol(distForest), 
+        ])
+    DM <- distForSel
+}
+debug at optMatch.R#107: nodeResponse <- sapply(rfRF100, function(x) {
+    predict(x$tree, newdata = Gdata, type = "node")
+})
+debug at optMatch.R#111: sumXDistMat = matrix(0, nrow = NROW(nodeResponse), ncol = NROW(nodeResponse))
+debug at optMatch.R#114: colnames(sumXDistMat) <- rownames(nodeResponse)
+debug at optMatch.R#115: rownames(sumXDistMat) <- rownames(nodeResponse)
+debug at optMatch.R#117: ntrees <- nTree
+debug at optMatch.R#123: for (treeNum in 1:ntrees) {
+    sumXDistMat <- sumXDistMat + x2Dist(rfRF100[[treeNum]]$tree, 
+        nodeResponse, treeNum)
+}
+debug at optMatch.R#124: sumXDistMat <- sumXDistMat + x2Dist(rfRF100[[treeNum]]$tree, 
+    nodeResponse, treeNum)
+debug at optMatch.R#124: sumXDistMat <- sumXDistMat + x2Dist(rfRF100[[treeNum]]$tree, 
+    nodeResponse, treeNum)
+debug at optMatch.R#124: sumXDistMat <- sumXDistMat + x2Dist(rfRF100[[treeNum]]$tree, 
+    nodeResponse, treeNum)
+debug at optMatch.R#129: xDistFor <- sumXDistMat/ntrees
+debug at optMatch.R#130: rownames(xDistFor) <- rownames(Gdata)
+debug at optMatch.R#131: colnames(xDistFor) <- rownames(Gdata)
+debug at optMatch.R#134: x2distForSel <- xDistFor[1:nMin, (nMin + 1):ncol(xDistFor)]
+debug at optMatch.R#135: rownames(x2distForSel) <- rownames(Gdata[1:nMin, ])
+debug at optMatch.R#136: colnames(x2distForSel) <- rownames(Gdata[(nMin + 1):ncol(xDistFor), 
+    ])
+debug at optMatch.R#140: DM <- x2distForSel
+debug at optMatch.R#178: if (method == "opt-coars-exact") {
+    x2distForSel <- xDistFor[1:nMin, (nMin + 1):ncol(xDistFor)]
+    rownames(x2distForSel) <- rownames(Gdata[1:nMin, ])
+    colnames(x2distForSel) <- rownames(Gdata[(nMin + 1):ncol(xDistFor), 
+        ])
+    numData <- Gdata[, split(names(Gdata), sapply(Gdata, function(x) paste(class(x), 
+        collapse = " ")))$numeric]
+    nv <- dim(numData)[2]
+    vnames <- colnames(numData)
+    for (i in (1:nv)) {
+        tmp <- reduceVar(numData[[i]], "quantile")
+        numData[[i]] <- tmp$x
+        numData[[i]] <- as.factor(numData[[i]])
+    }
+    library(foreach)
+    filtDataCat <- foreach(i = 1:nMin) %do% ifelse(Gdata[rownames(x2distForSel)[i], 
+        "Gender"] == Gdata[colnames(x2distForSel), "Gender"] & 
+        Gdata[rownames(x2distForSel)[i], "Handedness"] == Gdata[colnames(x2distForSel), 
+            "Handedness"], x2distForSel, 1)
+    filtDataCat <- matrix(unlist(filtDataCat), ncol = ncol(x2distForSel), 
+        byrow = T)
+    colnames(filtDataCat) <- rownames(Gdata[(nMin + 1):ncol(xDistFor), 
+        ])
+    rownames(filtDataCat) <- rownames(Gdata[1:nMin, ])
+    thr <- 100
+    filtDataCont <- foreach(i = 1:nMin) %do% ifelse(numData[rownames(x2distForSel)[i], 
+        "RMSD"] == numData[colnames(x2distForSel), "RMSD"] & 
+        numData[rownames(x2distForSel)[i], "Age"] == numData[colnames(x2distForSel), 
+            "Age"] & numData[rownames(x2distForSel)[i], "WASI.NVIQ"] == 
+        numData[colnames(x2distForSel), "WASI.NVIQ"], x2distForSel, 
+        thr)
+    filtDataCont <- matrix(unlist(filtDataCont), ncol = ncol(x2distForSel), 
+        byrow = T)
+    colnames(filtDataCont) <- rownames(Gdata[(nMin + 1):ncol(xDistFor), 
+        ])
+    rownames(filtDataCont) <- rownames(Gdata[1:nMin, ])
+    write.csv(filtDataCont, file = "filtDataCont.csv")
+    library("optmatch")
+    DM <- filtDataCont
+    optMatch <- fullmatch(DM, min.controls = 1, max.controls = 1, 
+        omit.fraction = NULL, tol = 0.001, subclass.indices = NULL)
+    matchSubj <- print(optMatch, grouped = T)
+    print(summary(optMatch))
+    capture.output(print(optMatch, grouped = T), file = "subjMatch.txt")
+    subjMatch <- read.table("subjMatch.txt")
+    splitSubj <- do.call("rbind", strsplit(c(as.character(subjMatch$Group), 
+        as.character(subjMatch$Members)), ","))
+    optData <- Gdata[c(as.character(gsub(",", "", (subjMatch[[1]]))), 
+        as.character(subjMatch[[2]])), ]
+    matchedData <- optData
+    pvalMotion <- (t.test(RMSD ~ group, data = matchedData))$p.value
+    pvalAge <- (t.test(Age ~ group, data = matchedData))$p.value
+    pvalNVIQ <- (t.test(WASI.NVIQ ~ group, data = matchedData))$p.value
+    pvalGender <- chisq.test(matchedData$group, matchedData$Gender)$p.value
+    pvalHandedness <- chisq.test(matchedData$group, matchedData$Handedness)$p.value
+    pvalsOpt <- matrix(c(pvalMotion, pvalAge, pvalNVIQ, pvalGender, 
+        pvalHandedness), ncol = 5)
+    colnames(pvalsOpt) <- c("RMSD", "Age", "WASI.NVIQ", "Gender", 
+        "Handedness")
+    rownames(pvalsOpt) <- "Pvals"
+    pvalsOpt <- as.table(pvalsOpt)
+    print(pvalsOpt)
+    smdMotion <- smd(matchedData, RMSD)
+    smdAge <- smd(matchedData, "Age")
+    smdNVIQ <- smd(matchedData, "WASI.NVIQ")
+    smdGender <- smd(matchedData, "Gender")
+    smdHandedness <- smd(matchedData, "Handedness")
+    smdOpt <- matrix(c(smdMotion, smdAge, smdNVIQ, smdGender, 
+        smdHandedness), ncol = 5)
+    colnames(smdOpt) <- c("RMSD", "Age", "WASI.NVIQ", "Gender", 
+        "Handedness")
+    rownames(smdOpt) <- "SMD"
+    smdOpt <- as.table(smdOpt)
+    print(smdOpt)
+    print(table(matchedData$group))
+    print(rownames(matchedData))
+    while (abs(smdMotion) > 0.1 | abs(smdAge) > 0.1 | abs(smdNVIQ) > 
+        0.1 | abs(smdGender) > 0.1 | abs(smdHandedness) > 0.1) {
+        distance <- NULL
+        for (i in 1:(table(optData$group)[2])) {
+            distance <- c(distance, (DM[splitSubj[i, 1], splitSubj[(i + 
+                (table(optData$group)[2])), 1]]))
+        }
+        splitSubj <- data.frame(splitSubj, distance)
+        maxSubjs <- (splitSubj[splitSubj[, "distance"] != 100, 
+            ])
+        excSubj <- maxSubjs[which.max(maxSubjs[, 2]), 1]
+        print(excSubj)
+        allMatchSubj = splitSubj[1:(table(optData$group)[2]), 
+            1]
+        remainedASD <- as.character(allMatchSubj[allMatchSubj != 
+            excSubj])
+        print(remainedASD)
+        trimedDM <- DM[remainedASD, ]
+        optMatch <- fullmatch(trimedDM, min.controls = 1, max.controls = 1, 
+            omit.fraction = NULL, tol = 0.001, subclass.indices = NULL)
+        summary(optMatch)
+        capture.output(print(optMatch, grouped = T), file = "iterSubjMatch.txt")
+        subjMatch <- read.table("iterSubjMatch.txt", header = T)
+        splitSubj <- do.call("rbind", strsplit(c(as.character(subjMatch$Group), 
+            as.character(subjMatch$Members)), ","))
+        optData <- Gdata[splitSubj, ]
+        matchedData <- optData
+        summaryGmatch(optData)
+    }
+} else if (method == "opt-coars-exact-rev") {
+    library(fields)
+    motionDist <- rdist(Gdata$RMSD)
+    motionDist[lower.tri(motionDist)] <- NA
+    diag(motionDist) <- NA
+    colnames(motionDist) <- rownames(Gdata)
+    rownames(motionDist) <- rownames(Gdata)
+    motionDist <- motionDist[1:nMin, (nMin + 1):nrow(Gdata)]
+    filtMotionDist <- motionDist[, ] < 0.151
+    ageDist <- rdist(Gdata$Age)
+    ageDist[lower.tri(ageDist)] <- NA
+    diag(ageDist) <- NA
+    colnames(ageDist) <- rownames(Gdata)
+    rownames(ageDist) <- rownames(Gdata)
+    ageDist <- ageDist[1:nMin, (nMin + 1):nrow(Gdata)]
+    filtAgeDist <- ageDist[, ] < 9.9
+    combineExactDist <- filtAgeDist & filtMotionDist
+    combineExactDist <- ifelse(combineExactDist, DM, 10)
+    a <- iterOpt(combineExactDist, Gdata)
+} else if (method == "opt-one-to-one") {
+    library("optmatch")
+    optMatch <- fullmatch(DM, min.controls = 1, max.controls = 1, 
+        omit.fraction = NULL, tol = 0.001, subclass.indices = NULL)
+    summary(optMatch)
+    capture.output(print(optMatch, grouped = T), file = "subjMatch.txt")
+    subjMatch <- read.table("subjMatch.txt", header = T)
+    splitSubj <- do.call("rbind", strsplit(c(as.character(subjMatch$Group), 
+        as.character(subjMatch$Members)), ","))
+    optData <- Gdata[splitSubj, ]
+    S <- summaryGmatch(optData)
+    while (abs(S$smdMotion) > 0.1 | abs(S$smdAge) > 0.1 | abs(S$smdFIQ) > 
+        0.1) {
+        distance <- NULL
+        for (i in 1:(table(optData$GROUP)[2])) {
+            distance <- c(distance, (DM[as.character(splitSubj[i, 
+                1]), as.character(splitSubj[(i + (table(optData$GROUP)[2])), 
+                1])]))
+        }
+        splitSubj <- data.frame(splitSubj, distance)
+        maxSubjs <- (splitSubj[splitSubj[, "distance"] != 100, 
+            ])
+        excSubj <- maxSubjs[which.max(maxSubjs[, 2]), 1]
+        print(excSubj)
+        allMatchSubj = splitSubj[1:(table(optData$GROUP)[2]), 
+            1]
+        remainedASD <- as.character(allMatchSubj[allMatchSubj != 
+            excSubj])
+        trimedDM <- DM[remainedASD, ]
+        optMatch <- fullmatch(trimedDM, min.controls = 1, max.controls = 1, 
+            omit.fraction = NULL, tol = 0.001, subclass.indices = NULL)
+        summary(optMatch)
+        capture.output(print(optMatch, grouped = T), file = "subjMatch.txt")
+        subjMatch <- read.table("subjMatch.txt", header = T)
+        splitSubj <- do.call("rbind", strsplit(c(as.character(subjMatch$Group), 
+            as.character(subjMatch$Members)), ","))
+        optData <- Gdata[splitSubj, ]
+        S <- summaryGmatch(optData)
+    }
+}
+debug at optMatch.R#178: if (method == "opt-coars-exact-rev") {
+    library(fields)
+    motionDist <- rdist(Gdata$RMSD)
+    motionDist[lower.tri(motionDist)] <- NA
+    diag(motionDist) <- NA
+    colnames(motionDist) <- rownames(Gdata)
+    rownames(motionDist) <- rownames(Gdata)
+    motionDist <- motionDist[1:nMin, (nMin + 1):nrow(Gdata)]
+    filtMotionDist <- motionDist[, ] < 0.151
+    ageDist <- rdist(Gdata$Age)
+    ageDist[lower.tri(ageDist)] <- NA
+    diag(ageDist) <- NA
+    colnames(ageDist) <- rownames(Gdata)
+    rownames(ageDist) <- rownames(Gdata)
+    ageDist <- ageDist[1:nMin, (nMin + 1):nrow(Gdata)]
+    filtAgeDist <- ageDist[, ] < 9.9
+    combineExactDist <- filtAgeDist & filtMotionDist
+    combineExactDist <- ifelse(combineExactDist, DM, 10)
+    a <- iterOpt(combineExactDist, Gdata)
+} else if (method == "opt-one-to-one") {
+    library("optmatch")
+    optMatch <- fullmatch(DM, min.controls = 1, max.controls = 1, 
+        omit.fraction = NULL, tol = 0.001, subclass.indices = NULL)
+    summary(optMatch)
+    capture.output(print(optMatch, grouped = T), file = "subjMatch.txt")
+    subjMatch <- read.table("subjMatch.txt", header = T)
+    splitSubj <- do.call("rbind", strsplit(c(as.character(subjMatch$Group), 
+        as.character(subjMatch$Members)), ","))
+    optData <- Gdata[splitSubj, ]
+    S <- summaryGmatch(optData)
+    while (abs(S$smdMotion) > 0.1 | abs(S$smdAge) > 0.1 | abs(S$smdFIQ) > 
+        0.1) {
+        distance <- NULL
+        for (i in 1:(table(optData$GROUP)[2])) {
+            distance <- c(distance, (DM[as.character(splitSubj[i, 
+                1]), as.character(splitSubj[(i + (table(optData$GROUP)[2])), 
+                1])]))
+        }
+        splitSubj <- data.frame(splitSubj, distance)
+        maxSubjs <- (splitSubj[splitSubj[, "distance"] != 100, 
+            ])
+        excSubj <- maxSubjs[which.max(maxSubjs[, 2]), 1]
+        print(excSubj)
+        allMatchSubj = splitSubj[1:(table(optData$GROUP)[2]), 
+            1]
+        remainedASD <- as.character(allMatchSubj[allMatchSubj != 
+            excSubj])
+        trimedDM <- DM[remainedASD, ]
+        optMatch <- fullmatch(trimedDM, min.controls = 1, max.controls = 1, 
+            omit.fraction = NULL, tol = 0.001, subclass.indices = NULL)
+        summary(optMatch)
+        capture.output(print(optMatch, grouped = T), file = "subjMatch.txt")
+        subjMatch <- read.table("subjMatch.txt", header = T)
+        splitSubj <- do.call("rbind", strsplit(c(as.character(subjMatch$Group), 
+            as.character(subjMatch$Members)), ","))
+        optData <- Gdata[splitSubj, ]
+        S <- summaryGmatch(optData)
+    }
+}
+debug at optMatch.R#178: if (method == "opt-one-to-one") {
+    library("optmatch")
+    optMatch <- fullmatch(DM, min.controls = 1, max.controls = 1, 
+        omit.fraction = NULL, tol = 0.001, subclass.indices = NULL)
+    summary(optMatch)
+    capture.output(print(optMatch, grouped = T), file = "subjMatch.txt")
+    subjMatch <- read.table("subjMatch.txt", header = T)
+    splitSubj <- do.call("rbind", strsplit(c(as.character(subjMatch$Group), 
+        as.character(subjMatch$Members)), ","))
+    optData <- Gdata[splitSubj, ]
+    S <- summaryGmatch(optData)
+    while (abs(S$smdMotion) > 0.1 | abs(S$smdAge) > 0.1 | abs(S$smdFIQ) > 
+        0.1) {
+        distance <- NULL
+        for (i in 1:(table(optData$GROUP)[2])) {
+            distance <- c(distance, (DM[as.character(splitSubj[i, 
+                1]), as.character(splitSubj[(i + (table(optData$GROUP)[2])), 
+                1])]))
+        }
+        splitSubj <- data.frame(splitSubj, distance)
+        maxSubjs <- (splitSubj[splitSubj[, "distance"] != 100, 
+            ])
+        excSubj <- maxSubjs[which.max(maxSubjs[, 2]), 1]
+        print(excSubj)
+        allMatchSubj = splitSubj[1:(table(optData$GROUP)[2]), 
+            1]
+        remainedASD <- as.character(allMatchSubj[allMatchSubj != 
+            excSubj])
+        trimedDM <- DM[remainedASD, ]
+        optMatch <- fullmatch(trimedDM, min.controls = 1, max.controls = 1, 
+            omit.fraction = NULL, tol = 0.001, subclass.indices = NULL)
+        summary(optMatch)
+        capture.output(print(optMatch, grouped = T), file = "subjMatch.txt")
+        subjMatch <- read.table("subjMatch.txt", header = T)
+        splitSubj <- do.call("rbind", strsplit(c(as.character(subjMatch$Group), 
+            as.character(subjMatch$Members)), ","))
+        optData <- Gdata[splitSubj, ]
+        S <- summaryGmatch(optData)
+    }
+}
+debug at optMatch.R#440: library("optmatch")
+debug at optMatch.R#441: optMatch <- fullmatch(DM, min.controls = 1, max.controls = 1, 
+    omit.fraction = NULL, tol = 0.001, subclass.indices = NULL)
+
+  1   2 
+189 304 
+
+  1   2 
+189 304 
