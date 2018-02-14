@@ -19,7 +19,7 @@ smd = function(Data,Var){
   stdMeanDiff = (mASD - mTD)/(sqrt((varASD + varTD)/2))
   #cat("SMD",pars$Data,pars$Var,"=", stdMeanDiff,"\n")}
   return(stdMeanDiff)}
-  #return(list(smd="stdMeanDiff",mASD="mASD",mTD="mTD",varASD="varASD",varTD="varTD"))}
+  #return(list(smd="stdMeanDiff"))}#,print(varASD=varASD,varTD=varTD)))}
 }
 #debug(smd)
  #smd(nonOutlierLowADOS,RMSD.PRE.censoring)

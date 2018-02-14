@@ -1,63 +1,53 @@
 summaryGmatch <- function(DATA){
 #=== Tabling pvalues and SMD for output ====
-pvalMotion <-
-        (t.test(RMSD ~ GROUP, data = DATA))$p.value
-meanRMSD <- t.test(RMSD ~ GROUP, data = DATA)$estimate
-pvalAge <- (t.test(AGE ~ GROUP, data = DATA))$p.value
-pvalFIQ <- (t.test(FIQ ~ GROUP, data = DATA))$p.value
-#pvalGender <- chisq.test(DATA$GROUP, DATA$Gender)$p.value
-#pvalHandedness <-
-#        chisq.test(DATA$GROUP, DATA$Handedness)$p.value
-
-pvalsOpt <-
-        matrix(c(
-                pvalMotion,
-                pvalAge,
-                pvalFIQ
-        ),
-        ncol = 3)
-colnames(pvalsOpt) <-
-        c("RMSD",
-          "Age",
-          "FIQ"
-        )
-rownames(pvalsOpt) <- "Pvals"
-pvalsOpt <- as.table(pvalsOpt)
-pvalsOpt
-
-meanRMSD<- t.test(RMSD ~ GROUP, data = DATA)$estimate
-meanAGE <- t.test(AGE ~ GROUP, data = DATA)$estimate
-meanFIQ <- t.test(FIQ ~ GROUP, data = DATA)$estimate
-mean <-   matrix(c(
-        meanRMSD,
-        meanAGE,
-        meanFIQ
-),
-ncol = 3)
-colnames(mean) <-
-        c("RMSD",
-          "Age",
-          "FIQ"
-        )
-rownames(mean) <- c("meanASD","meanTD")
-mean <- as.table(mean)
+        GROUP = DATA$GROUP
+        summary <- aggregate(.~GROUP,DATA,function(x) c(mean = mean(x), sd = sd(x),range = range(x)))
+        table(DATA$GROUP,DATA$HANDEDNESS)
+        pvalues <- t(sapply(DATA[c(-1,-5)], function(x) unlist(t.test(x~DATA$GROUP)["p.value"])))
+        # pvalHandedness <-
+        #         chisq.test(DATA$GROUP, DATA$HANDEDNESS)$p.value
+        
+#         apply(DATA[-1],2, smd)
+#         #debug(smd)
+#         #smd(nonOutlierLowADOS,RMSD.PRE.censoring)
+#         #smdGender = smd(nonOutlierLowADOS,"Gender")
+#         
+#         #b <-  function(data,name) {
+#         
+#         ## match.call return a call containing the specified arguments 
+#         ## and the function name also 
+#         ## I convert it to a list , from which I remove the first element(-1)
+#         ## which is the function name
+#         
+#         # pars <- as.list(match.call()[-1])
+#         # data[,as.character(pars$name)]
+#         #cat(pars$name,"smd is",mean( data[,as.character(pars$name)]))
+#         #sd(data[,as.character(pars$name)])
+#         
+#         # }
+#         
+#         
+# library(dplyr)  
+#         DATA %>% 
+#                 group_by(GROUP) %>%
+#                 do(data.frame(val=smd(.)))
+#         
 # Calculate standardized mean difference
 smdMotion <- smd(DATA, RMSD)
 smdAge <- smd(DATA, "AGE")
-smdFIQ <- smd(DATA, "FIQ")
-
+#smdFIQ <- smd(DATA, "FIQ")
+#smdHandedness <- smd(DATA, "Handedness")
 
 #===Tabling smd for output ===
 smdOpt <-
-        matrix(c(smdMotion, smdAge, smdFIQ),ncol = 3)
+        matrix(c(smdMotion, smdAge),ncol = 2)
 colnames(smdOpt) <-
         c("RMSD",
-          "AGE",
-          "FIQ")
+          "AGE")
 rownames(smdOpt) <- "SMD"
 smdOpt <- as.table(smdOpt)
 #return(smdMotion )#= smdMotion)#,smdAge = smdAge, smdOpt = smdOpt))
 return(list(smdMotion = smdMotion,smdAge = smdAge,smdFIQ = smdFIQ,
-                       print(pvalsOpt),print(smdOpt),print(table(DATA$GROUP)),print(mean)))
+                       print(summary),print(smdOpt),print(table(DATA$GROUP))),print(pvalues))
 #cat("pvalsOpt", "smdOpt","table(DATA$GROUP)","\n")
 }

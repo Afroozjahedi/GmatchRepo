@@ -26,11 +26,11 @@ Gmatch <- function (data, formula, nTree, method) {
         
         # screening for outlier in motion variable
         outlierVal <-
-                mean(data$RMSD.PRE.censoring) + 3 * sd(data$RMSD.PRE.censoring)
+        mean(data$RMSD.PRE.censoring) + 3 * sd(data$RMSD.PRE.censoring)
         
         # Create the dataframe for matching without outlier and label rows
-        Gdata <-
-                data[which(data$RMSD.PRE.censoring <= outlierVal), all.vars(formula)]
+         Gdata <-
+                 data[which(data$RMSD.PRE.censoring <= outlierVal), all.vars(formula)]
         
         rownames(Gdata) <- data[, "subj"]
         
@@ -38,9 +38,9 @@ Gmatch <- function (data, formula, nTree, method) {
         table (Gdata[[response]])
         
         # Outlier Subjects
-        outliers <-
-                as.character(data[which(data$RMSD.PRE.censoring >= outlierVal),]$subj)
-        cat("subjects with extreme motion are", outliers, "\n")
+        # outliers <-
+        #         as.character(data[which(data$RMSD.PRE.censoring >= outlierVal),]$subj)
+        # cat("subjects with extreme motion are", outliers, "\n")
         
         
         ##### Tree building ####
@@ -65,44 +65,7 @@ Gmatch <- function (data, formula, nTree, method) {
         
         ##### variable pvalue before matching ####
         summaryGmatch(Gdata)
-        # pvalNumeric <-
-        #         (lapply(Gdata[, which(sapply(Gdata, is.numeric))],
-        #                 function(x)
-        #                         (t.test(x ~ Gdata[[all.vars(formula)[1]]]))$p.value))
-        # pvalFact <-
-        #         (lapply(Gdata[, which(sapply(Gdata, is.factor))],
-        #                 function(x)
-        #                         (chisq.test(Gdata[[all.vars(formula)[1]]], x))$p.value))
-        # pval <- append(pvalNumeric, pvalFact)
-        # pval[[4]] <- NULL
-        # print(unlist(pval))
-        # 
-        # # Calculate standardized mean difference
-        # # debug(smd)
-        # # smd(nonOutlierLowADOS,all.vars(formula)[[2]])
-        # #
-        # # smdNumeric <- (lapply(Gdata[, which(sapply(Gdata, is.numeric))],
-        # #                        function(x) smd(Gdata, RMSD.PRE.censoring)))
-        # #
-        # smdMotion <- smd(Gdata, RMSD.PRE.censoring)
-        # smdAge <- smd(Gdata, "Age")
-        # smdNVIQ <- smd(Gdata, "WASI.NVIQ")
-        # smdGender <- smd(Gdata, "Gender")
-        # smdHandedness <- smd(Gdata, "Handedness")
-        # 
-        # # Tabling smd for output
-        # smdBef <-
-        #         matrix(c(smdMotion, smdAge, smdNVIQ, smdGender, smdHandedness),
-        #                ncol = 5)
-        # colnames(smdBef) <-
-        #         c("RMSD.PRE.censoring",
-        #           "Age",
-        #           "WASI.NVIQ",
-        #           "Handedness",
-        #           "Gender")
-        # rownames(smdBef) <- "BEFORE"
-        # smdBef <- as.table(smdBef)
-        # smdBef
+        
         ##### Random Forest growing ####
         set.seed(184684)
         ntrees <- nTree
@@ -291,58 +254,56 @@ Gmatch <- function (data, formula, nTree, method) {
                 dataNewExaX2 <-
                         rbind (Gdata[remRowName, ], (Gdata[namesTD, ]))
                 summaryGmatch(dataNewExaX2)
-                # pvalHandedness <-
-                #         chisq.test(dataNewExaX2$group, dataNewExaX2$Handedness)$p.value
-                # pvalGender <-
-                #         chisq.test(dataNewExaX2$group, dataNewExaX2$Gender)$p.value
-                # pvalMotion <-
-                #         (t.test(RMSD.PRE.censoring ~ group, data = dataNewExaX2))$p.value
-                # pvalAge <-
-                #         (t.test(Age ~ group, data = dataNewExaX2))$p.value
-                # pvalNVIQ <-
-                #         (t.test(WASI.NVIQ ~ group, data = dataNewExaX2))$p.value
-                # 
-                # # Tabling pvalues for output
-                # pvals1_3GH <-
-                #         matrix(c(
-                #                 pvalMotion,
-                #                 pvalAge,
-                #                 pvalNVIQ,
-                #                 pvalGender,
-                #                 pvalHandedness
-                #         ),
-                #         ncol = 5)
-                # colnames(pvals1_3GH) <-
-                #         c("RMSD.PRE.censoring",
-                #           "Age",
-                #           "WASI.NVIQ",
-                #           "Handedness",
-                #           "Gender")
-                # rownames(pvals1_3GH) <- "1-3GH"
-                # pvals1_3GH <- as.table(pvals1_3GH)
-                # print(pvals1_3GH)
-                # 
-                # smdMotion <- smd(dataNewExaX2, RMSD.PRE.censoring)
-                # smdAge <- smd(dataNewExaX2, Age)
-                # smdNVIQ <- smd(dataNewExaX2, WASI.NVIQ)
-                # smdGender <- smd(dataNewExaX2, Gender)
-                # smdhandedness <- smd(dataNewExaX2, Handedness)
-                # 
-                # # Tabling smd for output
-                # smd1_3GH <-
-                #         matrix(c(smdMotion, smdAge, smdNVIQ, smdGender, smdHandedness),
-                #                ncol = 5)
-                # colnames(smd1_3GH) <-
-                #         c("RMSD.PRE.censoring",
-                #           "Age",
-                #           "WASI.NVIQ",
-                #           "Handedness",
-                #           "Gender")
-                # rownames(smd1_3GH) <- "1_3GH"
-                # smd1_3GH <- as.table(smd1_3GH)
-                # print(smd1_3GH)
-                # print(table(dataNewExaX2$group))
+               
                 
+        } else if (method == "propensity") {
+                #### Propenity Score ###
+                # predict(rfRF100[[1]]$tree[[1]],type = "prob")
+                # extracting prob of being ASD for each subject across all trees.
+                #
+                pro <-
+                        rowMeans (sapply(rfRF100, function(x) {
+                                predict(x$tree, newdata = Gdata , type = "prob")[, 2]
+                        }))
+                logitPro <- log(pro / (1 - pro))
+                
+                # calculate distance matrix for propensity vector
+                library(fields)
+                distPro <- rdist(logitPro)
+                # We just need the upper tarangular of distance matrix without diagonals.
+                distPro[lower.tri(distPro)] <- NA
+                diag(distPro) <- NA
+                
+                distPro <- (distPro[1:(nMin),(nMin + 1):ncol(distPro)])
+                library(lattice)
+                levelplot(distPro,xlab="ASD",ylab="TD",main=" Logit Propensity Distance Matrix")
+                
+                # Find the 3 smallest distance value among TD subjects
+                minVal <-
+                        apply(distPro[, (nMin + 1):nrow(Gdata)], 1, function(x)
+                                return((sort(x))[1:3]))
+                # Find 3 subjects that has smallest distance among TD participants for each ASD subj.
+                min <-
+                        apply(distPro[, (nMin + 1): nrow(Gdata)], 1, function(x)
+                                return((order(x))[1:3]+ nMin))
+                
+                # Select TD subject equal to ASD subject from the table pool of selected candidates. 
+                proCandid <- sort(table(min), decreasing = TRUE)
+                
+                names(proCandid) <-
+                        rownames(Gdata[as.numeric(names(table(min))), ])
+                # Numbers of times TD candidates can be selected histogram.
+                hist(proCandid, main = "Number of times a subject is selected")
+                # number of unique TD candidates
+                length((which(!is.na(unique(
+                        rownames(proCandid)
+                )))))
+                
+                # Matched data using propemsity score.
+                
+                dataNewPro <-
+                        rbind (Gdata[1:nMin, ], Gdata [rownames(proCandid),])
+                summaryGmatch(dataNewPro)
         } else if (method == "1To3Dist") {
                 ### x2-defined distance using 1-3 match
                 #### 2- 1To3Dist: 1 to 3 based on x2-distance matrix ####
@@ -350,9 +311,14 @@ Gmatch <- function (data, formula, nTree, method) {
                         predict(x$tree, newdata = Gdata , type = "node")
                 })
                 
-                #xDistFor <- sumXDistMat/ntrees
-                #rownames(xDistFor) <- rownames(Gdata)
-                #colnames(xDistFor) <- rownames(Gdata)
+                xDistFor <- sumXDistMat/ntrees
+                rownames(xDistFor) <- rownames(Gdata)
+                colnames(xDistFor) <- rownames(Gdata)
+                
+                distPro <- (xDistFor[1:(nMin),(nMin + 1):ncol(xDistFor)])
+                library(lattice)
+                levelplot(xDistFor,xlab="ASD",ylab="TD",main=" Distance based Matrix")
+                
                 #mean(xDistFor)
                 selCandid <- 3
                 candidVal <-
@@ -374,54 +340,7 @@ Gmatch <- function (data, formula, nTree, method) {
                 
                 # 1-3 matching #
                 summaryGmatch(dataNew1to3X2)
-                # pvalHandedness <-
-                #         chisq.test(dataNew1to3X2$group, dataNew1to3X2$Handedness)$p.value
-                # pvalGender <-
-                #         chisq.test(dataNew1to3X2$group, dataNew1to3X2$Gender)$p.value
-                # pvalMotion <-
-                #         (t.test(RMSD.PRE.censoring ~ group, data = dataNew1to3X2))$p.value
-                # pvalAge <- (t.test(Age ~ group, data = dataNew1to3X2))$p.value
-                # pvalNVIQ <-
-                #         (t.test(WASI.NVIQ ~ group, data = dataNew1to3X2))$p.value
-                # pvals1_3 <-
-                #         matrix(c(
-                #                 pvalMotion,
-                #                 pvalAge,
-                #                 pvalNVIQ,
-                #                 pvalGender,
-                #                 pvalHandedness
-                #         ),
-                #         ncol = 5)
-                # colnames(pvals1_3) <-
-                #         c("RMSD.PRE.censoring",
-                #           "Age",
-                #           "WASI.NVIQ",
-                #           "Gender",
-                #           "Handedness"
-                #           )
-                # rownames(pvals1_3) <- "1-3"
-                # pvals1_3 <- as.table(pvals1_3)
-                # print(pvals1_3)
-                # 
-                # 
-                # smdMotion <- smd(dataNew1to3X2, RMSD.PRE.censoring)
-                # smdAge <- smd(dataNew1to3X2, Age)
-                # smdNVIQ <- smd(dataNew1to3X2, WASI.NVIQ)
-                # smdGender <- smd(dataNew1to3X2, Gender)
-                # smdhandedness <- smd(dataNew1to3X2, Handedness)
-                # smd1_3 <-
-                #         matrix(c(smdMotion, smdAge, smdNVIQ, smdGender, smdHandedness),
-                #                ncol = 5)
-                # colnames(smd1_3) <-
-                #         c("RMSD.PRE.censoring",
-                #           "Age",
-                #           "WASI.NVIQ",
-                #           "Gender",
-                #           "Handedness"
-                #           )
-                # rownames(smd1_3) <- "1_3"
-                # smd1_3 <- as.table(smd1_3)
-                # print(smd1_3)
+             
                 print(table(dataNew1to3X2$group))
                 subjectList <- rownames(dataNew1to3X2)
                 capture.output(subjectList, file = "subjList.csv")
@@ -441,14 +360,19 @@ Gmatch <- function (data, formula, nTree, method) {
                 #logistic propensity
                 logitPro <- log(pro / (1 - pro))
                 
-                spread <- 1 / 2 * (sd(logitPro))
+                spread <- 3/4 * (sd(logitPro))
                 # calculate distance matrix for propensity vector
                 library(fields)
                 distPro <- rdist(logitPro)
+                
                 # We just need the upper tarangular of distance matrix without diagonals.
                 distPro[lower.tri(distPro)] <- NA
                 diag(distPro) <- NA
-                
+                #distPro <- (distPro[1:(nMin),(nMin + 1):ncol(distPro)])
+                #(image(t(distPro[nrow(distPro):1,]),add = FALSE, axes = F,
+                 #      zlim = c(-4, 4),xlab="i",  col = rainbow(12)) )
+                #library(lattice)
+                #levelplot(distPro,xlab="ASD",ylab="TD",main=" Distance within calipers defined by the propensity score")
                 distForFilt <- xDistFor
                 filtPro = with(data.frame(distPro), subset(data.frame(distPro) <= spread))
                 distFodistrFilt <- ifelse(filtPro == FALSE, 100, distForFilt)
@@ -469,7 +393,7 @@ Gmatch <- function (data, formula, nTree, method) {
                         rownames(Gdata[as.numeric(names(table(minDFP))), ])
                 
                 # Numbers of times TD candidates can be selected histogram.
-                hist(DFPCand, main = "Number of times a subject is selected")
+                hist(DFPCand,ylab = "TD Candidates", xlab="Number of time TD candidates are selected",main = "Number of times a subject is selected in Calipers")
                 
                 # number of unique TD candidates
                 length((which(!is.na(
@@ -482,25 +406,7 @@ Gmatch <- function (data, formula, nTree, method) {
                 
                 #### p-values after distance within the calipar matching ###
                 summaryGmatch(data1To3Caliper)
-                # chisq.test(data1To3Caliper$group, data1To3Caliper$Handedness)
-                # chisq.test(data1To3Caliper$group, data1To3Caliper$Gender)
-                # pvalMotion <-
-                #         (t.test(RMSD.PRE.censoring ~ group, data = data1To3Caliper))$p.value
-                # pvalAge <- (t.test(Age ~ group, data = data1To3Caliper))$p.value
-                # pvalNVIQ <-
-                #         (t.test(WASI.NVIQ ~ group, data = data1To3Caliper))$p.value
-                # 
-                # DDFP <-
-                #         printPval(pvalMotion, "data1To3Caliper$RMSD.PRE.censoring")
-                # EDFP <- printPval(pvalAge, "data1To3Caliper$Age")
-                # GDFP <- printPval(pvalNVIQ, "data1To3Caliper$WASI.NVIQ")
-                # JDFP <- printPval(pvalHandedness, "data1To3Caliper$handedness")
-                # KDFP <- printPval(pvalGender, "data1To3Caliper$Gender")
-                # 
-                # smdMotion <- smd(data1To3Caliper, RMSD.PRE.censoring)
-                # smdAge <- smd(data1To3Caliper, Age)
-                # smdNVIQ <- smd(data1To3Caliper, WASI.NVIQ)
-                # smdGender <- smd(data1To3Caliper, Gender)
+            
                 # smdhandedness <- smd(data1To3Caliper, Handedness)
                 print (table(data1To3Caliper$group))
                 
@@ -522,44 +428,6 @@ Gmatch <- function (data, formula, nTree, method) {
                 
                 #### p-values after inverse distance matching ###
                 summaryGmatch(dataNewInv)
-                # chisq.test(dataNewInv$group, dataNewInv$Handedness)
-                # chisq.test(dataNewInv$group, dataNewInv$Gender)
-                # pvalMotion <-
-                #         (t.test(RMSD.PRE.censoring ~ group, data = dataNewInv))$p.value
-                # pvalAge <- (t.test(Age ~ group, data = dataNewInv))$p.value
-                # pvalNVIQ <- (t.test(WASI.NVIQ ~ group, data = dataNewInv))$p.value
-                # 
-                # DDFPB <- printPval(pvalMotion, "dataNewInv$RMSD.PRE.censoring")
-                # EDFPB <- printPval(pvalAge, "dataNewInv$Age")
-                # GDFPB <- printPval(pvalNVIQ, "dataNewInv$WASI.NVIQ")
-                # JDFPB <- printPval(pvalHandedness, "dataNewInv$handedness")
-                # KDFPB <- printPval(pvalGender, "dataNewInv$Gender")
-                # 
-                # smdMotion <- smd(dataNewInv, RMSD.PRE.censoring)
-                # smdAge <- smd(dataNewInv, Age)
-                # smdNVIQ <- smd(dataNewInv, WASI.NVIQ)
-                # smdGender <- smd(dataNewInv, Gender)
-                # smdhandedness <- smd(dataNewInv, Handedness)
-                # table(dataNewInv$group)
-                # 
-                # pvalsInv <-
-                #         matrix(c(
-                #                 pvalMotion,
-                #                 pvalAge,
-                #                 pvalNVIQ,
-                #                 pvalGender,
-                #                 pvalHandedness
-                #         ),
-                #         ncol = 5)
-                # colnames(pvalsInv) <-
-                #         c("RMSD.PRE.censoring",
-                #           "Age",
-                #           "WASI.NVIQ",
-                #           "Handedness",
-                #           "Gender")
-                # rownames(pvalsInv) <- "Inverse"
-                # pvalsInv <- as.table(pvalsInv)
-                # pvalsInv
-                # rbind(pvals, pvalsInv)
+                
         }
 }
